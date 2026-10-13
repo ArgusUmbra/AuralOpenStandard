@@ -234,7 +234,7 @@ async function digestAudio(reader, entry) {
   return hash.digest('hex');
 }
 
-export async function verify(path, options = {}) {
+async function verifyArchive(path, options = {}) {
   const handle = await open(path, 'r');
   try {
     const before = await handle.stat({ bigint: true });
@@ -253,10 +253,33 @@ export async function verify(path, options = {}) {
     if (digest !== asset.sha256) fail('audio SHA-256 mismatch');
     const after = await handle.stat({ bigint: true });
     if (!sameSnapshot(before, after)) fail('archive changed during validation');
-    return { status: 'integrity_valid', version: VERSION, audio_sha256: digest, audio_bytes: audioEntry.size };
+    const details = {
+      status: 'integrity_valid',
+      format: FORMAT,
+      version: VERSION,
+      manifest_sha256: createHash('sha256').update(manifest).digest('hex'),
+      original_path: asset.path,
+      audio_sha256: digest,
+      audio_bytes: audioEntry.size,
+    };
+    return details;
   } finally {
     await handle.close();
   }
+}
+
+export async function verifyDetailed(path, options = {}) {
+  return verifyArchive(path, options);
+}
+
+export async function verify(path, options = {}) {
+  const details = await verifyArchive(path, options);
+  return {
+    status: details.status,
+    version: details.version,
+    audio_sha256: details.audio_sha256,
+    audio_bytes: details.audio_bytes,
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

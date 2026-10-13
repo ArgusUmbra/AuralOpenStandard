@@ -120,12 +120,42 @@ class Draft02Tests(unittest.TestCase):
                                  completed.stderr)
                 if case['outcome'] == 'accept-0.2':
                     result = json.loads(completed.stdout)
+                    self.assertEqual(
+                        {'status', 'version', 'audio_sha256', 'audio_bytes'}, set(result),
+                    )
                     self.assertEqual('integrity_valid', result['status'])
                     self.assertEqual('0.2-draft', result['version'])
                     self.assertEqual(expected['audio']['length'], result['audio_bytes'])
                     self.assertEqual(expected['audio']['sha256'], result['audio_sha256'])
                 checked += 1
         self.assertGreaterEqual(checked, 20)
+
+    @unittest.skipUnless(shutil.which('node'), 'Node.js is not installed')
+    def test_node_detailed_api_is_explicitly_opt_in(self):
+        validator_uri = (ROOT / 'interop' / 'validate_aural.mjs').as_uri()
+        fixture = str(CORPUS / 'valid-minimal.aural')
+        script = (
+            f"import {{verify,verifyDetailed}} from {json.dumps(validator_uri)};"
+            f"console.log(JSON.stringify([await verify({json.dumps(fixture)}),"
+            f"await verifyDetailed({json.dumps(fixture)})]));"
+        )
+        completed = subprocess.run(
+            ['node', '--input-type=module', '--eval', script],
+            capture_output=True, text=True, check=False, timeout=10,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        basic, detailed = json.loads(completed.stdout)
+        self.assertEqual(
+            {'status', 'version', 'audio_sha256', 'audio_bytes'}, set(basic),
+        )
+        self.assertEqual(
+            {
+                'status', 'format', 'version', 'manifest_sha256', 'original_path',
+                'audio_sha256', 'audio_bytes',
+            },
+            set(detailed),
+        )
+        self.assertEqual({key: detailed[key] for key in basic}, basic)
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js is not installed')
     def test_node_rejects_oversized_file_before_bulk_read(self):

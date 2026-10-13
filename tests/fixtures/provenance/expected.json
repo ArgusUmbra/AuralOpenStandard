@@ -1,0 +1,573 @@
+{
+  "corpus": "AURAL experimental provenance signature v1 conformance fixtures",
+  "private_key_material_included": false,
+  "public_key": {
+    "algorithm": "Ed25519",
+    "raw_base64url": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+    "key_id": "urn:aural:key:ed25519:81a0a20f3cd85dc5662c25dec74739da5ce28507b6821ca7470ff8e530608255",
+    "key_record_sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+  },
+  "golden_vector": {
+    "assertion_length": 1330,
+    "assertion_sha256": "929ac312d855b1b4e9f2e15bd1cd3e1024822fdbcf2ed6172518e7e3a15343a0",
+    "signature_input_length": 1356,
+    "signature_input_sha256": "6365124f209c4bf461ea3e89eecc90c65d61875439236e1eeafdd5547d5410f6",
+    "signature_base64url": "APZ-SBL3tiVLpKnax1uzM-M0-kydTiq-u7DIeprO2nZgTKFdZogpapTwivVbjENhuzsuAqeK9rU435jpieL_Cg",
+    "record_length": 1445,
+    "record_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+    "signed_event_digest": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e",
+    "bound_package_sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+  },
+  "files_sha256": {
+    "ed25519-adversarial.json": "0372f31d62166fa0c998aedc93420738babcbacd166eb028f96d51bf01b4d515",
+    "invalid-acquiring-key.json": "6beb38281c5934099d992605456c98c2139441a45adbc0bb5f28ecdda61c68f5",
+    "invalid-bom.json": "95f08d9c85b9a22a8189cc1dd3cbbc1048d19e325b147fcd4e48625df4a4b350",
+    "invalid-critical-extension-missing.json": "18359ff37edf06493dfbdc499bc12659380eaa8cabda381d87c972fa665e28f3",
+    "invalid-critical-extension.json": "aacddc6852a52e08743704a73dca446b0fa21f88f523d968fab173727353935d",
+    "invalid-duplicate-key-record.json": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+    "invalid-duplicate-name.json": "3fe2a0761741207eed854ea06378474475ce977dc46d4d047078ac6940b556e5",
+    "invalid-envelope-member.json": "80cfdbe85607e7beaaabd3030b6170fde3bb12d88b35b1d87afb6f9570876bba",
+    "invalid-event-id.json": "a82018e680ccebf5c81ea12703e21f508bfa7fec2c987d2d4f9be5d98989abb0",
+    "invalid-excessive-depth.json": "88490e1fc7d752d34fa57b0227b7835fd9288bf5131ed11aecc7d0b42b1963e2",
+    "invalid-fraction.json": "b466ab8cb024a46e2eea2525b8408118c9cc2a2ddda7d2670fcf71b42cca849b",
+    "invalid-key-algorithm.json": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+    "invalid-key-encoding.json": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+    "invalid-key-id.json": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+    "invalid-key-protection.json": "a2a69b2ee3e534efaddd9fd423e089d3be22738a32335d6f8acf2abccb2ae309",
+    "invalid-key-unknown-member.json": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+    "invalid-missing-key-record.json": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+    "invalid-negative-zero.json": "44b30c9969e556fae9c4df8ee221f9ec8eb0b56914cd98db7638079c4e5a857a",
+    "invalid-noncanonical.json": "2f69991d1ed7a55cc19591c5891a47dfb6f3667befd2a3a5c1980557b348bbef",
+    "invalid-noncharacter.json": "bd9722842327687ca1047dcf54df7f950936ee31d96f47d58ce2c9945d81142d",
+    "invalid-padded-signature.json": "8427d640d16c16315352e02b59217f9e4f026cd14d043793e0b006413237bbb7",
+    "invalid-parent-algorithm.json": "c4e64d24aca18c3fea7a52901c8744309459a89f4f074270aef703c36f360611",
+    "invalid-parent-digest.json": "01ea7daa2bf9e96f371c56dcde6ef0c4ca002a754da951f2a287f3b6c96f4356",
+    "invalid-parent-duplicate.json": "2b6185abef06a1ec92825774ef004c3732fd767cb1800711f4f62a1d1da6b17a",
+    "invalid-parent-order.json": "8479044c35baa23ffab71d3a50ebfd3f7b2deca555b319b9023f29b66b07a45c",
+    "invalid-parent-self.json": "c6e2be497a62d13870ac5b04fefd5b9f21ddafbcb6361e4a7395455ef6824789",
+    "invalid-public-key-small-order.json": "906e7bd7fea81db877d79f0ce21bb13aaa75923cf2523ed6471fc1a1ef89e7c2",
+    "invalid-schema-version.json": "27a6ef8752af50ba133b3429ab6217185e1c13d1ab140b82a668ab62f5db36fd",
+    "invalid-signature-profile.json": "063b964245c4023fadb7297c67c3647ffc9b48a9088fd651f03e8e2978760703",
+    "invalid-signature-scalar.json": "a237086341ef0e5f773d98f08b81667edb4889fa48849ddc991667c78471e870",
+    "invalid-signature.json": "d57a33ecdece3a2df37fd210813b36a44d4ed336794482925f77af84c6c80523",
+    "invalid-source-pair.json": "4569872e638dae653f53f18cf5ee35692bf6bd3cd4ec534cd70b30a6a93e3edc",
+    "invalid-subject-length.json": "0f19e45381855aaaa3b234cfca26a0d73604f565ceae06d96507b667ecadf823",
+    "invalid-subject-manifest.json": "ebcc31ff0cc6cff83488726f92505a94dcd9c8aa54cee099354fd5d6fdabf4b1",
+    "invalid-subject-original.json": "3d49c5e8d59a6379933a30c3209e698bfc1b9f6ef80b7fb19ee0210aaae2e85a",
+    "invalid-time-basis.json": "4ba57a56d60fe0dab3781fcc1ba28aaa8820187b837cabe88b65e126e4f2853f",
+    "invalid-time-order.json": "babb92d8a29e4f6e95c57d0057f430abec58cc580ea2b6fb50b7ae6deff29e6d",
+    "invalid-timestamp.json": "ef782b9a98da726600433fc91c5d2233a2bb2cedf425ff0692ef9de81e1ec136",
+    "invalid-trailing-newline.json": "99c520cc6810e08ac82dbac91f6941031a08b4f811245f3ce9271d0c0decf9a3",
+    "invalid-unknown-member.json": "fd74d04bcefe5727c9724ebcd6af4d2685e6434955c87bae6c3fe6eb72f94084",
+    "invalid-unpaired-surrogate.json": "35f6c1a8375d972b939138ae98c3311224bd26b4ff14953789cf02b3cf046461",
+    "invalid-unsafe-integer.json": "70a19a8819e51609d05047cec4d0627acbc531b489fc4f79dfe877bdcfa0a96d",
+    "invalid-utf8.json": "77d9da2866caa60d98fafe828ec4dc24d3eae458ea96641fb1d1912fad48760d",
+    "key-invalid-algorithm.json": "7c7507488381516b784ac7fc4382d7f2a451ca9f3587f31cbe0a682690e3b085",
+    "key-invalid-encoding.json": "7f421e14ba755ad33aecf8491c1e4d6a38157339f0534141e3650775c9fa7673",
+    "key-invalid-id.json": "ef22519a81ff5fe48393df5f788fd877701b0ed04e87b1bdb43c735f90ab7304",
+    "key-invalid-small-order.json": "03a175f940aaf2b121f8b789c60927c94ce7ca4f36582403996ac08d6bd8e56d",
+    "key-invalid-unknown-member.json": "afe7f9cc75e975f39bdb8d676aac37674a4ec9b872963e50344aeedd65fb198e",
+    "valid-key.json": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609",
+    "valid-original-acquired.assertion.json": "929ac312d855b1b4e9f2e15bd1cd3e1024822fdbcf2ed6172518e7e3a15343a0",
+    "valid-original-acquired.json": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+    "valid-original-acquired.signature-input.bin": "6365124f209c4bf461ea3e89eecc90c65d61875439236e1eeafdd5547d5410f6",
+    "valid-received-with-parent.json": "ae11fac3a420a5dd24d24e52443f22d565b1fc71a12b839d330b8595dcced2d3",
+    "valid-unknown-optional.json": "bc8e3f88f88c090c7588ff1d33101a6679b6605ac5e222aeea81a40d0f414572"
+  },
+  "cases": {
+    "valid-original-acquired": {
+      "outcome": "accept",
+      "reason": "complete original-asset-acquired vector",
+      "event": "valid-original-acquired.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "event_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+      "signed_event_digest": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e"
+    },
+    "valid-received-with-parent": {
+      "outcome": "accept",
+      "reason": "received evidence references the golden parent",
+      "event": "valid-received-with-parent.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "event_sha256": "ae11fac3a420a5dd24d24e52443f22d565b1fc71a12b839d330b8595dcced2d3",
+      "signed_event_digest": "046f625d475a05f792d7f41354e12e016c2e32690034f157515b63337384937d"
+    },
+    "valid-unknown-optional": {
+      "outcome": "accept",
+      "reason": "unknown non-critical extension",
+      "event": "valid-unknown-optional.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "event_sha256": "bc8e3f88f88c090c7588ff1d33101a6679b6605ac5e222aeea81a40d0f414572",
+      "signed_event_digest": "6ca603ec338e14aefa93510dbd727b2b31048bfe5cfa3b627c1130b34ea7cbea"
+    },
+    "invalid-noncanonical": {
+      "outcome": "reject",
+      "reason": "pretty-printed record is not exact JCS",
+      "event": "invalid-noncanonical.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "canonicalization",
+      "event_sha256": "2f69991d1ed7a55cc19591c5891a47dfb6f3667befd2a3a5c1980557b348bbef"
+    },
+    "invalid-trailing-newline": {
+      "outcome": "reject",
+      "reason": "canonical record has a trailing LF",
+      "event": "invalid-trailing-newline.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "canonicalization",
+      "event_sha256": "99c520cc6810e08ac82dbac91f6941031a08b4f811245f3ce9271d0c0decf9a3"
+    },
+    "invalid-bom": {
+      "outcome": "reject",
+      "reason": "record begins with a UTF-8 BOM",
+      "event": "invalid-bom.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "json_profile",
+      "event_sha256": "95f08d9c85b9a22a8189cc1dd3cbbc1048d19e325b147fcd4e48625df4a4b350"
+    },
+    "invalid-utf8": {
+      "outcome": "reject",
+      "reason": "record contains invalid UTF-8",
+      "event": "invalid-utf8.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "json_profile",
+      "event_sha256": "77d9da2866caa60d98fafe828ec4dc24d3eae458ea96641fb1d1912fad48760d"
+    },
+    "invalid-duplicate-name": {
+      "outcome": "reject",
+      "reason": "envelope contains a duplicate signature name",
+      "event": "invalid-duplicate-name.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "canonicalization",
+      "event_sha256": "3fe2a0761741207eed854ea06378474475ce977dc46d4d047078ac6940b556e5"
+    },
+    "invalid-envelope-member": {
+      "outcome": "reject",
+      "reason": "unknown envelope member suggests multisignature",
+      "event": "invalid-envelope-member.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "schema",
+      "event_sha256": "80cfdbe85607e7beaaabd3030b6170fde3bb12d88b35b1d87afb6f9570876bba"
+    },
+    "invalid-signature": {
+      "outcome": "reject",
+      "reason": "one signature bit is changed",
+      "event": "invalid-signature.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "signature",
+      "event_sha256": "d57a33ecdece3a2df37fd210813b36a44d4ed336794482925f77af84c6c80523"
+    },
+    "invalid-padded-signature": {
+      "outcome": "reject",
+      "reason": "signature uses padded base64url",
+      "event": "invalid-padded-signature.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "encoding",
+      "event_sha256": "8427d640d16c16315352e02b59217f9e4f026cd14d043793e0b006413237bbb7"
+    },
+    "invalid-signature-scalar": {
+      "outcome": "reject",
+      "reason": "signature has an out-of-range S scalar",
+      "event": "invalid-signature-scalar.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "signature",
+      "event_sha256": "a237086341ef0e5f773d98f08b81667edb4889fa48849ddc991667c78471e870"
+    },
+    "invalid-signature-profile": {
+      "outcome": "reject",
+      "reason": "unknown signature profile fails closed",
+      "event": "invalid-signature-profile.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "unsupported_signature_profile",
+      "event_sha256": "063b964245c4023fadb7297c67c3647ffc9b48a9088fd651f03e8e2978760703"
+    },
+    "invalid-schema-version": {
+      "outcome": "reject",
+      "reason": "unknown event schema version fails closed",
+      "event": "invalid-schema-version.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "unsupported_version",
+      "event_sha256": "27a6ef8752af50ba133b3429ab6217185e1c13d1ab140b82a668ab62f5db36fd"
+    },
+    "invalid-event-id": {
+      "outcome": "reject",
+      "reason": "event identifier is not UUIDv4",
+      "event": "invalid-event-id.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "identifier",
+      "event_sha256": "a82018e680ccebf5c81ea12703e21f508bfa7fec2c987d2d4f9be5d98989abb0"
+    },
+    "invalid-unknown-member": {
+      "outcome": "reject",
+      "reason": "unknown assertion core member",
+      "event": "invalid-unknown-member.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "schema",
+      "event_sha256": "fd74d04bcefe5727c9724ebcd6af4d2685e6434955c87bae6c3fe6eb72f94084"
+    },
+    "invalid-critical-extension": {
+      "outcome": "reject",
+      "reason": "unknown critical extension",
+      "event": "invalid-critical-extension.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "unsupported_extension",
+      "event_sha256": "aacddc6852a52e08743704a73dca446b0fa21f88f523d968fab173727353935d"
+    },
+    "invalid-critical-extension-missing": {
+      "outcome": "reject",
+      "reason": "critical extension has no corresponding value",
+      "event": "invalid-critical-extension-missing.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "schema",
+      "event_sha256": "18359ff37edf06493dfbdc499bc12659380eaa8cabda381d87c972fa665e28f3"
+    },
+    "invalid-timestamp": {
+      "outcome": "reject",
+      "reason": "invalid RFC 3339 calendar date",
+      "event": "invalid-timestamp.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "timestamp",
+      "event_sha256": "ef782b9a98da726600433fc91c5d2233a2bb2cedf425ff0692ef9de81e1ec136"
+    },
+    "invalid-time-basis": {
+      "outcome": "reject",
+      "reason": "trusted is not a supported claimed-time basis",
+      "event": "invalid-time-basis.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "unsupported_time_basis",
+      "event_sha256": "4ba57a56d60fe0dab3781fcc1ba28aaa8820187b837cabe88b65e126e4f2853f"
+    },
+    "invalid-time-order": {
+      "outcome": "reject",
+      "reason": "claimed-time entries are out of required order",
+      "event": "invalid-time-order.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "schema",
+      "event_sha256": "babb92d8a29e4f6e95c57d0057f430abec58cc580ea2b6fb50b7ae6deff29e6d"
+    },
+    "invalid-source-pair": {
+      "outcome": "reject",
+      "reason": "source type does not match acquisition method",
+      "event": "invalid-source-pair.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "schema",
+      "event_sha256": "4569872e638dae653f53f18cf5ee35692bf6bd3cd4ec534cd70b30a6a93e3edc"
+    },
+    "invalid-key-protection": {
+      "outcome": "reject",
+      "reason": "unsupported key-protection disclosure",
+      "event": "invalid-key-protection.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "schema",
+      "event_sha256": "a2a69b2ee3e534efaddd9fd423e089d3be22738a32335d6f8acf2abccb2ae309"
+    },
+    "invalid-acquiring-key": {
+      "outcome": "reject",
+      "reason": "acquiring key does not equal signing key",
+      "event": "invalid-acquiring-key.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "schema",
+      "event_sha256": "6beb38281c5934099d992605456c98c2139441a45adbc0bb5f28ecdda61c68f5"
+    },
+    "invalid-subject-manifest": {
+      "outcome": "reject",
+      "reason": "manifest digest does not match package",
+      "event": "invalid-subject-manifest.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "subject_binding",
+      "event_sha256": "ebcc31ff0cc6cff83488726f92505a94dcd9c8aa54cee099354fd5d6fdabf4b1"
+    },
+    "invalid-subject-original": {
+      "outcome": "reject",
+      "reason": "original digest does not match package",
+      "event": "invalid-subject-original.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "subject_binding",
+      "event_sha256": "3d49c5e8d59a6379933a30c3209e698bfc1b9f6ef80b7fb19ee0210aaae2e85a"
+    },
+    "invalid-subject-length": {
+      "outcome": "reject",
+      "reason": "original length does not match package",
+      "event": "invalid-subject-length.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "subject_binding",
+      "event_sha256": "0f19e45381855aaaa3b234cfca26a0d73604f565ceae06d96507b667ecadf823"
+    },
+    "invalid-parent-self": {
+      "outcome": "reject",
+      "reason": "event references itself as a parent",
+      "event": "invalid-parent-self.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "parent_reference",
+      "event_sha256": "c6e2be497a62d13870ac5b04fefd5b9f21ddafbcb6361e4a7395455ef6824789"
+    },
+    "invalid-parent-duplicate": {
+      "outcome": "reject",
+      "reason": "duplicate parent event identifier",
+      "event": "invalid-parent-duplicate.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "parent_reference",
+      "event_sha256": "2b6185abef06a1ec92825774ef004c3732fd767cb1800711f4f62a1d1da6b17a"
+    },
+    "invalid-parent-order": {
+      "outcome": "reject",
+      "reason": "parent array is not sorted",
+      "event": "invalid-parent-order.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "parent_reference",
+      "event_sha256": "8479044c35baa23ffab71d3a50ebfd3f7b2deca555b319b9023f29b66b07a45c"
+    },
+    "invalid-parent-digest": {
+      "outcome": "reject",
+      "reason": "parent digest is not 32 bytes",
+      "event": "invalid-parent-digest.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "parent_reference",
+      "event_sha256": "01ea7daa2bf9e96f371c56dcde6ef0c4ca002a754da951f2a287f3b6c96f4356"
+    },
+    "invalid-parent-algorithm": {
+      "outcome": "reject",
+      "reason": "unknown parent digest algorithm",
+      "event": "invalid-parent-algorithm.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "unsupported_algorithm",
+      "event_sha256": "c4e64d24aca18c3fea7a52901c8744309459a89f4f074270aef703c36f360611"
+    },
+    "invalid-fraction": {
+      "outcome": "reject",
+      "reason": "floating-point JSON number",
+      "event": "invalid-fraction.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "canonicalization",
+      "event_sha256": "b466ab8cb024a46e2eea2525b8408118c9cc2a2ddda7d2670fcf71b42cca849b"
+    },
+    "invalid-unsafe-integer": {
+      "outcome": "reject",
+      "reason": "integer outside interoperable range",
+      "event": "invalid-unsafe-integer.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "json_profile",
+      "event_sha256": "70a19a8819e51609d05047cec4d0627acbc531b489fc4f79dfe877bdcfa0a96d"
+    },
+    "invalid-negative-zero": {
+      "outcome": "reject",
+      "reason": "negative zero JSON token",
+      "event": "invalid-negative-zero.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "json_profile",
+      "event_sha256": "44b30c9969e556fae9c4df8ee221f9ec8eb0b56914cd98db7638079c4e5a857a"
+    },
+    "invalid-unpaired-surrogate": {
+      "outcome": "reject",
+      "reason": "unpaired escaped surrogate",
+      "event": "invalid-unpaired-surrogate.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "json_profile",
+      "event_sha256": "35f6c1a8375d972b939138ae98c3311224bd26b4ff14953789cf02b3cf046461"
+    },
+    "invalid-noncharacter": {
+      "outcome": "reject",
+      "reason": "Unicode noncharacter",
+      "event": "invalid-noncharacter.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "json_profile",
+      "event_sha256": "bd9722842327687ca1047dcf54df7f950936ee31d96f47d58ce2c9945d81142d"
+    },
+    "invalid-excessive-depth": {
+      "outcome": "reject",
+      "reason": "complete record exceeds maximum JSON nesting depth",
+      "event": "invalid-excessive-depth.json",
+      "keys": [
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "resource_limit",
+      "event_sha256": "88490e1fc7d752d34fa57b0227b7835fd9288bf5131ed11aecc7d0b42b1963e2"
+    },
+    "invalid-key-id": {
+      "outcome": "reject",
+      "reason": "key_id does not match public key",
+      "event": "invalid-key-id.json",
+      "keys": [
+        "key-invalid-id.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "key_id_mismatch",
+      "event_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+    },
+    "invalid-key-encoding": {
+      "outcome": "reject",
+      "reason": "padded public-key base64url",
+      "event": "invalid-key-encoding.json",
+      "keys": [
+        "key-invalid-encoding.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "encoding",
+      "event_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+    },
+    "invalid-key-unknown-member": {
+      "outcome": "reject",
+      "reason": "unknown public-key core member",
+      "event": "invalid-key-unknown-member.json",
+      "keys": [
+        "key-invalid-unknown-member.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "schema",
+      "event_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+    },
+    "invalid-key-algorithm": {
+      "outcome": "reject",
+      "reason": "unsupported public-key algorithm",
+      "event": "invalid-key-algorithm.json",
+      "keys": [
+        "key-invalid-algorithm.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "unsupported_algorithm",
+      "event_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+    },
+    "invalid-public-key-small-order": {
+      "outcome": "reject",
+      "reason": "identity public key and identity-R forgery",
+      "event": "invalid-public-key-small-order.json",
+      "keys": [
+        "key-invalid-small-order.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "public_key",
+      "event_sha256": "906e7bd7fea81db877d79f0ce21bb13aaa75923cf2523ed6471fc1a1ef89e7c2"
+    },
+    "invalid-duplicate-key-record": {
+      "outcome": "reject",
+      "reason": "duplicate key_id in supplied key records",
+      "event": "invalid-duplicate-key-record.json",
+      "keys": [
+        "valid-key.json",
+        "valid-key.json"
+      ],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "duplicate_key",
+      "event_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+    },
+    "invalid-missing-key-record": {
+      "outcome": "reject",
+      "reason": "no supplied key matches signing_key_id",
+      "event": "invalid-missing-key-record.json",
+      "keys": [],
+      "package": "../conformance/valid-unicode.aural",
+      "error_category": "missing_key",
+      "event_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+    }
+  }
+}

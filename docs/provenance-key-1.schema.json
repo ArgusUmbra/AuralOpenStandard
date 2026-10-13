@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:org.aural.signing-key:schema:1",
+  "title": "AURAL Experimental Ed25519 Public-Key Record v1",
+  "description": "Structural companion schema. The prose specification is authoritative for JCS bytes, key decoding, key-ID computation, extension criticality, and cryptographic validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["key_schema", "key_schema_version", "algorithm", "key_id", "public_key"],
+  "properties": {
+    "key_schema": { "const": "org.aural.signing-key" },
+    "key_schema_version": { "const": "1" },
+    "algorithm": { "const": "Ed25519" },
+    "key_id": {
+      "type": "string",
+      "pattern": "^urn:aural:key:ed25519:[0-9a-f]{64}$"
+    },
+    "public_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9+.-]*:[!-~]+$",
+        "maxLength": 255
+      }
+    },
+    "critical_extensions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9+.-]*:[!-~]+$",
+        "maxLength": 255
+      }
+    }
+  }
+}
