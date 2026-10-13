@@ -4,13 +4,14 @@ import sys
 from .core import AuralError, package, verify, extract
 
 def main():
-    parser = argparse.ArgumentParser(prog='aural', description='AURAL draft 0.1 reference CLI')
+    parser = argparse.ArgumentParser(prog='aural', description='AURAL Draft 0.2 reference CLI')
     commands = parser.add_subparsers(dest='command', required=True)
     pack = commands.add_parser('pack', help='Package an original WAV')
     pack.add_argument('wav')
     pack.add_argument('output')
     pack.add_argument('--title', default='')
-    pack.add_argument('--recorded-at', default=None, help='UTC timestamp; source-declared, not authenticated')
+    pack.add_argument('--recorded-at', default=None,
+                      help='RFC 3339 timestamp with offset; source-declared, not authenticated')
     v = commands.add_parser('verify', help='Check package and payload integrity')
     v.add_argument('aural')
     ex = commands.add_parser('extract', help='Extract the original WAV after verification')

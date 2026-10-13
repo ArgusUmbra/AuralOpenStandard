@@ -1,2 +1,2 @@
-"""AURAL draft reference implementation (stdlib-only)."""
-__version__ = '0.1.0.dev0'
+"""AURAL Draft 0.2 reference implementation (stdlib-only)."""
+__version__ = '0.2.0.dev0'

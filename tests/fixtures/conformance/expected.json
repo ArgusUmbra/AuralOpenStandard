@@ -1,0 +1,175 @@
+{
+  "audio": {
+    "length": 52,
+    "sha256": "125f39eda3fea4265c129447c18ea5a89ed7302255c7a33ef104393c1f716873"
+  },
+  "corpus": "AURAL Draft 0.2 conformance fixtures",
+  "fixtures": {
+    "invalid-altered-original.aural": {
+      "fixture_sha256": "beeaaf62836cdbd8eae08ec97d2ea4d990aa245475d1919de2faa6ed05500ae6",
+      "outcome": "reject",
+      "reason": "altered original with valid ZIP CRC32"
+    },
+    "invalid-asset-hash.aural": {
+      "fixture_sha256": "5c4c576216a21905fb08aafcd15155099ee09130b52f2a6f1b4df52fd9bbf250",
+      "outcome": "reject",
+      "reason": "incorrect declared SHA-256"
+    },
+    "invalid-compression.aural": {
+      "fixture_sha256": "7a00c6b5c0f7e3963893ff8628dc649f64a570eb23653e8bb09d8e2cbc3843a4",
+      "outcome": "reject",
+      "reason": "unsupported DEFLATE compression"
+    },
+    "invalid-critical-extension.aural": {
+      "fixture_sha256": "8c79c792202493f7e288c52e47658a963f8199b48f0cbf5ac828c746d679266e",
+      "outcome": "reject",
+      "reason": "unknown critical extension"
+    },
+    "invalid-duplicate-entry.aural": {
+      "fixture_sha256": "2c7279ca8b5c72e7d990bfbe1ef3fc4d417cb6b5fcb64bdc9a644e9506b8d46c",
+      "outcome": "reject",
+      "reason": "duplicate ZIP entry"
+    },
+    "invalid-duplicate-key.aural": {
+      "fixture_sha256": "d7b8cdbe81520e4d9b273c82508bef88aeac0ff74834e60ac9b055aa746950fc",
+      "outcome": "reject",
+      "reason": "duplicate JSON object name"
+    },
+    "invalid-entry-comment.aural": {
+      "fixture_sha256": "218bcf02b522c1ab5adfe2e07fd9baa946c465a8cc70514daee0edacbfede694",
+      "outcome": "reject",
+      "reason": "central-directory entry comment is prohibited"
+    },
+    "invalid-excessive-declared-size.aural": {
+      "fixture_sha256": "2f529c69ddcecec1de5f81241be29e1341f60d20a24686831354f800460c68bd",
+      "outcome": "reject",
+      "reason": "declared audio exceeds 8 GiB"
+    },
+    "invalid-excessive-depth.aural": {
+      "fixture_sha256": "1792e6885968d8dc31521d347350198c12ceaba1b8a3e437ad2ae2e17c788122",
+      "outcome": "reject",
+      "reason": "manifest nesting exceeds 32"
+    },
+    "invalid-extra-field.aural": {
+      "fixture_sha256": "4814055b3c3c11cb94bc0fbcecfb8f7fcbec6e070a1474ff4d796ad69771670e",
+      "outcome": "reject",
+      "reason": "non-ZIP64 extra field"
+    },
+    "invalid-fraction.aural": {
+      "fixture_sha256": "467bd95238ff4503bb445d84feeb6bb4138b162498635f846724e21e1ca9f239",
+      "outcome": "reject",
+      "reason": "fractional JSON number"
+    },
+    "invalid-local-central-crc.aural": {
+      "fixture_sha256": "03421813e33e108cdb2caa32b056a32180d36fa12dbd0ae0b0ef345795c1dd18",
+      "outcome": "reject",
+      "reason": "local and central CRC32 disagree"
+    },
+    "invalid-malformed-json.aural": {
+      "fixture_sha256": "769e17135887991505f32879222dcd838b44f1246da498044e18a6dace7f8c0a",
+      "outcome": "reject",
+      "reason": "malformed JSON"
+    },
+    "invalid-malformed-local-header.aural": {
+      "fixture_sha256": "a00ab5632514ac461b94dc857efcc07c57e2ba09dea5e208d9ebf6f1db0823e2",
+      "outcome": "reject",
+      "reason": "malformed local header signature"
+    },
+    "invalid-negative-zero.aural": {
+      "fixture_sha256": "a93f986d8c3e2f99ed7e2d879575ca0158aa9c9a5295bd086c9a6ac621bb8a8c",
+      "outcome": "reject",
+      "reason": "negative zero is not canonical"
+    },
+    "invalid-noncanonical.aural": {
+      "fixture_sha256": "2654c40b9885cc3bb16de8c8fb50bb150a1a76384cce5acbb7c1ee52454f5bfd",
+      "outcome": "reject",
+      "reason": "manifest is not exact JCS bytes"
+    },
+    "invalid-noncharacter.aural": {
+      "fixture_sha256": "1bfe15553eadd4c83ffb4185c12e816d50fb5cfff0f9fd52a33d43837b19d5e2",
+      "outcome": "reject",
+      "reason": "I-JSON Unicode noncharacter"
+    },
+    "invalid-special-file.aural": {
+      "fixture_sha256": "d4e8cc8e7c3f3e676662e5b42eb835692588177013402627f3b4182d4a6aab7a",
+      "outcome": "reject",
+      "reason": "entry metadata describes a symlink"
+    },
+    "invalid-trailer.aural": {
+      "fixture_sha256": "847c2f10d3036f70ccf2bc40220fb84cdb6fc64f62db189f0f783987b2dbf73a",
+      "outcome": "reject",
+      "reason": "bytes after terminal EOCD"
+    },
+    "invalid-unknown-member.aural": {
+      "fixture_sha256": "4f8bb003c6865f5343c2cc4ee3963f95b0d49bae51a107babcbc24768f9e07d8",
+      "outcome": "reject",
+      "reason": "unknown core manifest member"
+    },
+    "invalid-unnecessary-zip64-extra.aural": {
+      "fixture_sha256": "a2e32735fb69e3e1cca82c885ac5e5476059bb4481fa3492009cefc53c7c35ab",
+      "outcome": "reject",
+      "reason": "Draft 0.2 forbids ZIP64 extra fields without matching sentinels"
+    },
+    "invalid-unpaired-surrogate.aural": {
+      "fixture_sha256": "1048b6772c3012e2b0bb232df66137a606a0e905bda22ba4ed9f63555b66ef7f",
+      "outcome": "reject",
+      "reason": "isolated escaped surrogate"
+    },
+    "invalid-unsafe-filename.aural": {
+      "fixture_sha256": "84be64b199e829a416d383e31f406fa822879fd140d4e5b721db5296d3cc7971",
+      "outcome": "reject",
+      "reason": "unsafe and undeclared filename"
+    },
+    "invalid-unsafe-integer.aural": {
+      "fixture_sha256": "43ab0b7b78d8484e7c874b2d89a9f8d27fe3088f213d6478a8046b2e25087061",
+      "outcome": "reject",
+      "reason": "integer outside interoperable range"
+    },
+    "invalid-utf8.aural": {
+      "fixture_sha256": "09dd54a0fe3e19d3aa4e7eabd300abfda0fa6655c2b738036dd5f60f49335db8",
+      "outcome": "reject",
+      "reason": "invalid UTF-8"
+    },
+    "invalid-version.aural": {
+      "fixture_sha256": "5f69ce4deea3cc0e746a2f1f3d869b917ae522685b750674c9f9e83c4f1a27bd",
+      "outcome": "reject",
+      "reason": "unsupported format version"
+    },
+    "legacy-0.1-zip64-extra.aural": {
+      "fixture_sha256": "aae595895d264f7c3e37c81748dbcce7429d8da6f6d410177ac6042ead2025f2",
+      "outcome": "accept-legacy-0.1",
+      "reason": "Assignment 002-compatible unnecessary ZIP64 extra field"
+    },
+    "legacy-0.1.aural": {
+      "fixture_sha256": "1ada3f30d2cbe1fcd422f0f14041b5adfe84cd886aaacad7b3c6ad415571227a",
+      "outcome": "accept-legacy-0.1",
+      "reason": "distinct Draft 0.1 compatibility path"
+    },
+    "valid-independent.aural": {
+      "fixture_sha256": "66968f5b917d972797cac9a4b6600e3c6743600653cb8183536ee77b7a666a2b",
+      "outcome": "accept-0.2",
+      "reason": "independently assembled classic ZIP and literal canonical manifest"
+    },
+    "valid-minimal.aural": {
+      "fixture_sha256": "aae82053118bedd4ab55c32322aeab7219ac2f4fced5847eee6d07215feda6a3",
+      "outcome": "accept-0.2",
+      "reason": "minimal canonical Draft 0.2 package"
+    },
+    "valid-unicode.aural": {
+      "fixture_sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85",
+      "outcome": "accept-0.2",
+      "reason": "Unicode and UTF-16 JCS key ordering"
+    },
+    "valid-unknown-optional.aural": {
+      "fixture_sha256": "0d49bb044d089d5999152aa43011e8246dc0112391d8900d350511498925f20f",
+      "outcome": "accept-0.2",
+      "reason": "unknown non-critical extension"
+    }
+  },
+  "golden_manifest": {
+    "length": 402,
+    "path": "golden-manifest.json",
+    "sha256": "83ff69181aa5a1eb7b04a042eee89081a155a61736838615444f60c95672c3da",
+    "trailing_lf": false
+  }
+}

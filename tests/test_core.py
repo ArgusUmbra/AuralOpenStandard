@@ -246,7 +246,9 @@ class CoreTests(unittest.TestCase):
 
     def test_malformed_manifests_fail_closed(self):
         with zipfile.ZipFile(self.pkg) as archive:
-            valid = archive.read('manifest.json')
+            document = json.loads(archive.read('manifest.json'))
+        document['title'] = ''
+        valid = canonical_json(document)
         cases = {
             'non_object': b'[]\n',
             'invalid_syntax': b'{"broken":]\n',
@@ -266,7 +268,7 @@ class CoreTests(unittest.TestCase):
         with zipfile.ZipFile(self.pkg) as archive:
             valid = json.loads(archive.read('manifest.json'))
         cases = {
-            'missing_title': {key: value for key, value in valid.items() if key != 'title'},
+            'missing_format': {key: value for key, value in valid.items() if key != 'format'},
             'non_string_title': {**valid, 'title': {'nested': 'value'}},
             'invalid_recorded_at': {**valid, 'recorded_at': []},
             'unknown_field': {**valid, 'unexpected': 'value'},
