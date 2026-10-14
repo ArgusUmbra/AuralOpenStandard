@@ -299,6 +299,19 @@ class _ValidatedRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class _IndexedSignedRecord:
+    record: bytes
+    validated: _ValidatedRecord
+    signed_event_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SignedEventIndex:
+    by_event_id: dict
+    duplicate_signed_records: int
+
+
+@dataclass(frozen=True, slots=True)
 class _ValidatedKey:
     document: dict
     public_key: bytes
@@ -788,6 +801,10 @@ def _parse_validate_record(raw):
     return _ValidatedRecord(document, document['assertion'])
 
 
+def _signed_event_sha256(record):
+    return hashlib.sha256(SIGNED_EVENT_DOMAIN + record).hexdigest()
+
+
 def _validate_key_record(raw):
     document = _parse_canonical_json(raw, 'public-key record', VerificationStage.KEY)
     required = {'algorithm', 'key_id', 'key_schema', 'key_schema_version', 'public_key'}
@@ -1120,6 +1137,92 @@ def _validate_key_sequence(values, label):
         )
 
 
+def _validate_graph_record_inputs(records, limits):
+    _validate_key_sequence(records, 'signed-event records')
+    if not records:
+        raise ProvenanceVerificationError(
+            ErrorCategory.INPUT,
+            VerificationStage.INPUT,
+            'signed-event records must not be empty',
+        )
+    if len(records) > limits.event_records:
+        raise ProvenanceVerificationError(
+            ErrorCategory.RESOURCE_LIMIT,
+            VerificationStage.INPUT,
+            'too many signed-event records',
+        )
+
+    aggregate = 0
+    for record in records:
+        if type(record) is not bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.INPUT,
+                VerificationStage.INPUT,
+                'signed-event record must be bytes',
+            )
+        if not 1 <= len(record) <= limits.event_bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.RESOURCE_LIMIT,
+                VerificationStage.INPUT,
+                'signed-event record size is outside the configured limit',
+            )
+        aggregate += len(record)
+        if aggregate > limits.aggregate_event_bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.RESOURCE_LIMIT,
+                VerificationStage.INPUT,
+                'aggregate signed-event data exceeds the configured limit',
+            )
+
+
+def _index_signed_event_records(records, limits=None):
+    """Strictly validate and deterministically index bounded signed records."""
+    effective = _graph_limits_or_default(limits)
+    _validate_graph_record_inputs(records, effective)
+
+    indexed = []
+    for record in records:
+        validated = _parse_validate_record(record)
+        indexed.append(_IndexedSignedRecord(
+            record=record,
+            validated=validated,
+            signed_event_sha256=_signed_event_sha256(record),
+        ))
+    indexed.sort(key=lambda item: (
+        item.validated.assertion['event_id'],
+        item.signed_event_sha256,
+        item.record,
+    ))
+
+    by_digest = {}
+    by_event_id = {}
+    duplicates = 0
+    for item in indexed:
+        digest_record = by_digest.get(item.signed_event_sha256)
+        if digest_record is not None and digest_record != item.record:
+            _fail(
+                ErrorCategory.SIGNED_EVENT_DIGEST_COLLISION,
+                VerificationStage.GRAPH,
+                'signed-event digest identifies different record bytes',
+            )
+        by_digest[item.signed_event_sha256] = item.record
+
+        event_id = item.validated.assertion['event_id']
+        existing = by_event_id.get(event_id)
+        if existing is not None:
+            if existing.signed_event_sha256 != item.signed_event_sha256:
+                _fail(
+                    ErrorCategory.EVENT_ID_COLLISION,
+                    VerificationStage.GRAPH,
+                    'event_id identifies different signed-event digests',
+                )
+            duplicates += 1
+            continue
+        by_event_id[event_id] = item
+
+    return _SignedEventIndex(by_event_id, duplicates)
+
+
 def verify_signed_event(
         record: bytes,
         public_key_records: Sequence[bytes],
@@ -1210,7 +1313,7 @@ def verify_signed_event(
         event_id=assertion['event_id'],
         evidence_id=assertion['evidence_id'],
         signing_key_id=assertion['signing_key_id'],
-        signed_event_sha256=hashlib.sha256(SIGNED_EVENT_DOMAIN + record).hexdigest(),
+        signed_event_sha256=_signed_event_sha256(record),
         asset_integrity=asset_integrity,
         investigator_identity=InvestigatorIdentityStatus.NOT_ESTABLISHED,
         key_trust=KeyTrustStatus.NOT_EVALUATED,
@@ -1278,41 +1381,7 @@ def verify_signed_event_graph(
 ) -> GraphVerificationResult:
     """Preflight a detached signed-event graph; graph validation is pending."""
     effective = _graph_limits_or_default(limits)
-    _validate_key_sequence(records, 'signed-event records')
-    if not records:
-        raise ProvenanceVerificationError(
-            ErrorCategory.INPUT,
-            VerificationStage.INPUT,
-            'signed-event records must not be empty',
-        )
-    if len(records) > effective.event_records:
-        raise ProvenanceVerificationError(
-            ErrorCategory.RESOURCE_LIMIT,
-            VerificationStage.INPUT,
-            'too many signed-event records',
-        )
-
-    aggregate = 0
-    for record in records:
-        if type(record) is not bytes:
-            raise ProvenanceVerificationError(
-                ErrorCategory.INPUT,
-                VerificationStage.INPUT,
-                'signed-event record must be bytes',
-            )
-        if not 1 <= len(record) <= effective.event_bytes:
-            raise ProvenanceVerificationError(
-                ErrorCategory.RESOURCE_LIMIT,
-                VerificationStage.INPUT,
-                'signed-event record size is outside the configured limit',
-            )
-        aggregate += len(record)
-        if aggregate > effective.aggregate_event_bytes:
-            raise ProvenanceVerificationError(
-                ErrorCategory.RESOURCE_LIMIT,
-                VerificationStage.INPUT,
-                'aggregate signed-event data exceeds the configured limit',
-            )
+    _validate_graph_record_inputs(records, effective)
 
     _validate_key_sequence(public_key_records, 'public-key records')
     if len(public_key_records) > effective.key_records:
@@ -1343,6 +1412,7 @@ def verify_signed_event_graph(
                 'aggregate public-key data exceeds the configured limit',
             )
 
+    _index_signed_event_records(records, effective)
     raise ProvenanceVerificationError(
         ErrorCategory.NOT_IMPLEMENTED,
         VerificationStage.GRAPH,
