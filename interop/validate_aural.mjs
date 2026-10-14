@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Independent, dependency-free Draft 0.2 validator for bounded classic and ZIP64 ZIP.
-import { open } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { lstat, open } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
@@ -106,6 +107,19 @@ function crc32(data) { return (updateCrc32(0xffffffff, data) ^ 0xffffffff) >>> 0
 function sameSnapshot(left, right) {
   return left.size === right.size && left.dev === right.dev && left.ino === right.ino
     && left.mtimeNs === right.mtimeNs && left.ctimeNs === right.ctimeNs;
+}
+
+function safeOpenFlags() {
+  if (process.platform !== 'win32'
+      && (!Number.isInteger(constants.O_NONBLOCK)
+          || !Number.isInteger(constants.O_NOFOLLOW))) {
+    fail('safe package-open flags are unavailable on this platform');
+  }
+  let flags = constants.O_RDONLY;
+  for (const flag of [constants.O_CLOEXEC, constants.O_NONBLOCK, constants.O_NOFOLLOW]) {
+    if (Number.isInteger(flag)) flags |= flag;
+  }
+  return flags;
 }
 
 class BoundedReader {
@@ -377,13 +391,32 @@ async function digestAudio(reader, entry) {
 }
 
 async function verifyArchive(path, options = {}) {
-  const handle = await open(path, 'r');
+  let pathBefore;
+  try {
+    pathBefore = await lstat(path, { bigint: true });
+  } catch (error) {
+    fail('package path could not be inspected safely');
+  }
+  if (pathBefore.isSymbolicLink() || !pathBefore.isFile()) {
+    fail('package path must be a regular, non-symbolic-link file');
+  }
+
+  let handle;
+  try {
+    handle = await open(path, safeOpenFlags());
+  } catch (error) {
+    if (error?.auralValidationFailure === true) throw error;
+    fail('package path could not be opened safely');
+  }
+  let failed = false;
   try {
     const before = await handle.stat({ bigint: true });
+    if (!before.isFile()) fail('package handle must identify a regular file');
+    if (!sameSnapshot(pathBefore, before)) fail('package changed while it was being opened');
     const requestedLimit = options.maxArchive;
     const archiveLimit = Number.isSafeInteger(requestedLimit) && requestedLimit >= 0
       ? Math.min(requestedLimit, MAX_ARCHIVE) : MAX_ARCHIVE;
-    if (!before.isFile() || before.size > BigInt(archiveLimit)) fail('archive size');
+    if (before.size > BigInt(archiveLimit)) fail('archive size');
     const reader = new BoundedReader(handle, before);
     const entries = await parseZip(reader);
     const manifestEntry = entries.get('manifest.json');
@@ -394,7 +427,16 @@ async function verifyArchive(path, options = {}) {
     const digest = await digestAudio(reader, audioEntry);
     if (digest !== asset.sha256) fail('audio SHA-256 mismatch');
     const after = await handle.stat({ bigint: true });
-    if (!sameSnapshot(before, after)) fail('archive changed during validation');
+    let pathAfter;
+    try {
+      pathAfter = await lstat(path, { bigint: true });
+    } catch (error) {
+      fail('package changed or disappeared during validation');
+    }
+    if (!after.isFile() || pathAfter.isSymbolicLink() || !pathAfter.isFile()
+        || !sameSnapshot(before, after) || !sameSnapshot(before, pathAfter)) {
+      fail('archive changed during validation');
+    }
     const details = {
       status: 'integrity_valid',
       format: FORMAT,
@@ -405,8 +447,16 @@ async function verifyArchive(path, options = {}) {
       audio_bytes: audioEntry.size,
     };
     return details;
+  } catch (error) {
+    failed = true;
+    if (error?.auralValidationFailure === true) throw error;
+    fail('package input could not be processed safely');
   } finally {
-    await handle.close();
+    try {
+      await handle.close();
+    } catch (error) {
+      if (!failed) fail('package handle could not be closed safely');
+    }
   }
 }
 

@@ -266,6 +266,7 @@ class _PreflightedFile:
     handle: BinaryIO
     snapshot: _FileSnapshot
     label: str
+    path: Optional[PathLike] = None
 
 
 class _DuplicateName(ValueError):
@@ -922,28 +923,81 @@ def _snapshot(file_stat):
 
 def _open_preflighted_file(stack, path, maximum, label):
     try:
-        handle = stack.enter_context(open(Path(path), 'rb', buffering=0))
-        before = os.fstat(handle.fileno())
+        file_path = Path(path)
+        path_before = os.lstat(file_path)
     except (OSError, TypeError, ValueError) as exc:
         raise ProvenanceVerificationError(
             ErrorCategory.INPUT,
             VerificationStage.INPUT,
-            f'cannot open {label}: {exc}',
+            f'cannot inspect {label}: {exc}',
         ) from exc
 
-    if not stat.S_ISREG(before.st_mode):
+    if stat.S_ISLNK(path_before.st_mode) or not stat.S_ISREG(path_before.st_mode):
         raise ProvenanceVerificationError(
             ErrorCategory.RESOURCE_LIMIT,
             VerificationStage.INPUT,
-            f'{label} must be a regular file',
+            f'{label} must be a regular, non-symbolic-link file',
         )
+
+    if os.name != 'nt' and (not hasattr(os, 'O_NONBLOCK') or not hasattr(os, 'O_NOFOLLOW')):
+        raise ProvenanceVerificationError(
+            ErrorCategory.INPUT,
+            VerificationStage.INPUT,
+            f'{label} cannot be opened safely on this platform',
+        )
+    flags = os.O_RDONLY
+    for name in ('O_BINARY', 'O_CLOEXEC', 'O_NOINHERIT', 'O_NONBLOCK', 'O_NOFOLLOW'):
+        flags |= getattr(os, name, 0)
+    try:
+        descriptor = os.open(file_path, flags)
+    except (OSError, TypeError, ValueError) as exc:
+        raise ProvenanceVerificationError(
+            ErrorCategory.INPUT,
+            VerificationStage.INPUT,
+            f'cannot open {label} safely: {exc}',
+        ) from exc
+
+    try:
+        try:
+            before = os.fstat(descriptor)
+        except OSError as exc:
+            raise ProvenanceVerificationError(
+                ErrorCategory.INPUT,
+                VerificationStage.INPUT,
+                f'{label} handle could not be inspected safely: {exc}',
+            ) from exc
+        if not stat.S_ISREG(before.st_mode):
+            raise ProvenanceVerificationError(
+                ErrorCategory.RESOURCE_LIMIT,
+                VerificationStage.INPUT,
+                f'{label} handle must identify a regular file',
+            )
+        if _snapshot(path_before) != _snapshot(before):
+            raise ProvenanceVerificationError(
+                ErrorCategory.INPUT,
+                VerificationStage.INPUT,
+                f'{label} changed while it was being opened',
+            )
+        try:
+            handle = open(descriptor, 'rb', buffering=0, closefd=True)
+        except (OSError, TypeError, ValueError) as exc:
+            raise ProvenanceVerificationError(
+                ErrorCategory.INPUT,
+                VerificationStage.INPUT,
+                f'{label} descriptor could not be wrapped safely: {exc}',
+            ) from exc
+    except Exception:
+        os.close(descriptor)
+        raise
+    stack.enter_context(handle)
+
     if before.st_size < 1 or before.st_size > maximum:
         raise ProvenanceVerificationError(
             ErrorCategory.RESOURCE_LIMIT,
             VerificationStage.INPUT,
             f'{label} size is outside the configured limit',
         )
-    return _PreflightedFile(handle, _snapshot(before), label)
+    return _PreflightedFile(handle, _snapshot(before), label, file_path)
 
 
 def _read_preflighted_file(source):
@@ -970,14 +1024,20 @@ def _read_preflighted_file(source):
         offset += count
 
     try:
-        after = _snapshot(os.fstat(source.handle.fileno()))
+        handle_after = os.fstat(source.handle.fileno())
+        path_after = os.lstat(source.path) if source.path is not None else None
     except OSError as exc:
         raise ProvenanceVerificationError(
             ErrorCategory.INPUT,
             VerificationStage.INPUT,
             f'{source.label} could not be inspected after reading: {exc}',
         ) from exc
-    if after != source.snapshot:
+    if (not stat.S_ISREG(handle_after.st_mode)
+            or _snapshot(handle_after) != source.snapshot
+            or (path_after is not None
+                and (stat.S_ISLNK(path_after.st_mode)
+                     or not stat.S_ISREG(path_after.st_mode)
+                     or _snapshot(path_after) != source.snapshot))):
         raise ProvenanceVerificationError(
             ErrorCategory.INPUT,
             VerificationStage.INPUT,

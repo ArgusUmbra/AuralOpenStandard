@@ -1,6 +1,8 @@
 from contextlib import ExitStack
 from dataclasses import FrozenInstanceError
+import os
 from pathlib import Path
+import stat
 from types import SimpleNamespace
 import tempfile
 import unittest
@@ -35,6 +37,7 @@ class _ReadHandle:
 
 def _stat(size, *, modified=1):
     return SimpleNamespace(
+        st_mode=stat.S_IFREG,
         st_dev=1,
         st_ino=2,
         st_size=size,
@@ -205,11 +208,116 @@ class ProvenanceFoundationTests(unittest.TestCase):
             root = Path(temporary)
             with mock.patch.object(provenance, '_read_preflighted_file') as reader:
                 error = self.assert_error(
-                    provenance.ErrorCategory.INPUT,
+                    provenance.ErrorCategory.RESOURCE_LIMIT,
                     lambda: provenance.verify_signed_event_files(root, []),
                 )
                 self.assertEqual(provenance.VerificationStage.INPUT, error.stage)
                 reader.assert_not_called()
+
+        fifo = SimpleNamespace(st_mode=stat.S_IFIFO)
+        with mock.patch.object(provenance.os, 'lstat', return_value=fifo), \
+                mock.patch.object(provenance.os, 'open') as opened:
+            self.assert_error(
+                provenance.ErrorCategory.RESOURCE_LIMIT,
+                lambda: provenance.verify_signed_event_files('event.fifo', []),
+            )
+            opened.assert_not_called()
+
+    def test_symlink_paths_are_rejected_before_open(self):
+        symbolic = SimpleNamespace(st_mode=stat.S_IFLNK)
+        with mock.patch.object(provenance.os, 'lstat', return_value=symbolic), \
+                mock.patch.object(provenance.os, 'open') as opened:
+            self.assert_error(
+                provenance.ErrorCategory.RESOURCE_LIMIT,
+                lambda: provenance.verify_signed_event_files('event-link.json', []),
+            )
+            opened.assert_not_called()
+
+        real_lstat = os.lstat
+        event = CORPUS / 'valid-original-acquired.json'
+        with mock.patch.object(
+                provenance.os, 'lstat',
+                side_effect=lambda path: symbolic if Path(path).name == 'key-link.json'
+                else real_lstat(path)):
+            self.assert_error(
+                provenance.ErrorCategory.RESOURCE_LIMIT,
+                lambda: provenance.verify_signed_event_files(event, ['key-link.json']),
+            )
+
+    def test_actual_symlink_paths_are_rejected_where_supported(self):
+        event = CORPUS / 'valid-original-acquired.json'
+        key = CORPUS / 'valid-key.json'
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            event_link = root / 'event-link.json'
+            key_link = root / 'key-link.json'
+            try:
+                event_link.symlink_to(event)
+                key_link.symlink_to(key)
+            except OSError as exc:
+                self.skipTest(f'symbolic-link creation is unavailable: {exc}')
+            self.assert_error(
+                provenance.ErrorCategory.RESOURCE_LIMIT,
+                lambda: provenance.verify_signed_event_files(event_link, []),
+            )
+            self.assert_error(
+                provenance.ErrorCategory.RESOURCE_LIMIT,
+                lambda: provenance.verify_signed_event_files(event, [key_link]),
+            )
+
+    @unittest.skipUnless(hasattr(os, 'mkfifo'), 'POSIX FIFO creation is unavailable')
+    def test_actual_fifo_is_rejected_without_opening(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fifo = Path(temporary) / 'event.fifo'
+            os.mkfifo(fifo)
+            with mock.patch.object(
+                    provenance.os, 'open', side_effect=AssertionError('FIFO was opened')):
+                self.assert_error(
+                    provenance.ErrorCategory.RESOURCE_LIMIT,
+                    lambda: provenance.verify_signed_event_files(fifo, []),
+                )
+
+    def test_safe_descriptors_are_closed_and_platform_flags_are_used(self):
+        event = CORPUS / 'valid-original-acquired.json'
+        key = CORPUS / 'valid-key.json'
+        descriptors = []
+        flags_seen = []
+        real_open = os.open
+
+        def tracked_open(path, flags, *args, **kwargs):
+            descriptor = real_open(path, flags, *args, **kwargs)
+            descriptors.append(descriptor)
+            flags_seen.append(flags)
+            return descriptor
+
+        with mock.patch.object(provenance.os, 'open', side_effect=tracked_open):
+            result = provenance.verify_signed_event_files(event, [key])
+        self.assertEqual(provenance.VerificationStatus.SIGNATURE_VALID, result.status)
+        self.assertEqual(2, len(descriptors))
+        for descriptor in descriptors:
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+        for name in ('O_NONBLOCK', 'O_NOFOLLOW'):
+            flag = getattr(os, name, None)
+            if flag is not None:
+                self.assertTrue(all(value & flag for value in flags_seen), name)
+
+    def test_open_identity_mismatch_is_structured_and_closes_descriptor(self):
+        before = _stat(4)
+        after = _stat(4, modified=2)
+        with ExitStack() as stack, \
+                mock.patch.object(provenance.os, 'lstat', return_value=before), \
+                mock.patch.object(provenance.os, 'open', return_value=123), \
+                mock.patch.object(provenance.os, 'fstat', return_value=after), \
+                mock.patch.object(provenance.os, 'close') as closed:
+            error = self.assert_error(
+                provenance.ErrorCategory.INPUT,
+                lambda: provenance._open_preflighted_file(
+                    stack, 'event.json', 4, 'signed-event record',
+                ),
+            )
+        self.assertIn('changed while it was being opened', str(error))
+        closed.assert_called_once_with(123)
 
     def test_truncated_input_is_a_controlled_failure(self):
         source = provenance._PreflightedFile(
@@ -251,7 +359,7 @@ class ProvenanceFoundationTests(unittest.TestCase):
 
     def test_key_count_is_checked_before_opening_files(self):
         limits = provenance.VerificationLimits(key_records=0)
-        with mock.patch('builtins.open') as opened:
+        with mock.patch.object(provenance.os, 'open') as opened:
             self.assert_error(
                 provenance.ErrorCategory.RESOURCE_LIMIT,
                 lambda: provenance.verify_signed_event_files('event', ['key'], limits=limits),

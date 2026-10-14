@@ -268,6 +268,8 @@ class Draft02Tests(unittest.TestCase):
         source = (ROOT / 'interop' / 'validate_aural.mjs').read_text(encoding='utf-8')
         self.assertNotIn('readFile(', source)
         self.assertIn("const IO_CHUNK = 1024 * 1024", source)
+        self.assertIn('handle = await open(path, safeOpenFlags())', source)
+        self.assertIn('pathBefore = await lstat(path, { bigint: true })', source)
         self.assertIn("const before = await handle.stat({ bigint: true })", source)
         self.assertIn("await this.handle.read(", source)
 

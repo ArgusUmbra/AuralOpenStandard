@@ -2,6 +2,7 @@ import base64
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -341,10 +342,118 @@ class ProvenanceSignatureTests(unittest.TestCase):
         source = (ROOT / 'interop' / 'validate_provenance.mjs').read_text(encoding='utf-8')
         self.assertNotIn('readFile(', source)
         self.assertNotIn('Promise.all(', source)
-        self.assertIn("const handle = await open(filePath, 'r')", source)
+        self.assertIn('handle = await open(filePath, safeOpenFlags(label))', source)
+        self.assertIn('pathBefore = await lstat(filePath, { bigint: true })', source)
         self.assertIn("const before = await handle.stat({ bigint: true })", source)
         self.assertIn('await handle.read(raw, offset, raw.length - offset, offset)', source)
-        self.assertIn('if (!sameSnapshot(before, after))', source)
+        self.assertIn('!sameSnapshot(before, after)', source)
+        self.assertIn('await handle.close()', source)
+
+    @unittest.skipUnless(shutil.which('node'), 'Node.js is not installed')
+    def test_node_readers_reject_directories(self):
+        provenance_uri = (ROOT / 'interop' / 'validate_provenance.mjs').as_uri()
+        aural_uri = (ROOT / 'interop' / 'validate_aural.mjs').as_uri()
+        event = CORPUS / 'valid-original-acquired.json'
+        key = CORPUS / 'valid-key.json'
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cases = [
+                ('event-directory', 'provenance', root, []),
+                ('key-directory', 'provenance', event, [root]),
+                ('package-directory', 'package', root, []),
+                ('bound-package-directory', 'bound', event, [key]),
+            ]
+            encoded = [
+                [name, kind, str(path), [str(item) for item in keys]]
+                for name, kind, path, keys in cases
+            ]
+            script = (
+                f"import {{verifySignedEventFiles}} from {json.dumps(provenance_uri)};"
+                f"import {{verify}} from {json.dumps(aural_uri)};"
+                f"const cases={json.dumps(encoded)};const results=[];"
+                "for(const [name,kind,path,keys] of cases){try{"
+                f"if(kind==='package')await verify(path);"
+                f"else if(kind==='bound')await verifySignedEventFiles(path,keys,{json.dumps(str(root))});"
+                "else await verifySignedEventFiles(path,keys);"
+                "results.push([name,'accepted']);}catch(error){results.push([name,"
+                "error.category??null,error.auralValidationFailure===true]);}}"
+                "console.log(JSON.stringify(results));"
+            )
+            completed = subprocess.run(
+                ['node', '--input-type=module', '--eval', script],
+                capture_output=True, text=True, check=False, timeout=10,
+            )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        results = {item[0]: item[1:] for item in json.loads(completed.stdout)}
+        self.assertEqual(['resource_limit', False], results['event-directory'])
+        self.assertEqual(['resource_limit', False], results['key-directory'])
+        self.assertEqual([None, True], results['package-directory'])
+        self.assertEqual(['package_integrity', False], results['bound-package-directory'])
+
+    @unittest.skipUnless(shutil.which('node'), 'Node.js is not installed')
+    def test_node_readers_reject_symlinks_where_supported(self):
+        provenance_uri = (ROOT / 'interop' / 'validate_provenance.mjs').as_uri()
+        aural_uri = (ROOT / 'interop' / 'validate_aural.mjs').as_uri()
+        event = CORPUS / 'valid-original-acquired.json'
+        key = CORPUS / 'valid-key.json'
+        package = ROOT / 'tests' / 'fixtures' / 'conformance' / 'valid-minimal.aural'
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            event_link = root / 'event-link.json'
+            key_link = root / 'key-link.json'
+            package_link = root / 'package-link.aural'
+            try:
+                event_link.symlink_to(event)
+                key_link.symlink_to(key)
+                package_link.symlink_to(package)
+            except OSError as exc:
+                self.skipTest(f'symbolic-link creation is unavailable: {exc}')
+            script = (
+                f"import {{verifySignedEventFiles}} from {json.dumps(provenance_uri)};"
+                f"import {{verify}} from {json.dumps(aural_uri)};const results=[];"
+                f"try{{await verifySignedEventFiles({json.dumps(str(event_link))},[]);}}"
+                "catch(error){results.push(error.category);};"
+                f"try{{await verifySignedEventFiles({json.dumps(str(event))},"
+                f"[{json.dumps(str(key_link))}]);}}catch(error){{results.push(error.category);}};"
+                f"try{{await verify({json.dumps(str(package_link))});}}"
+                "catch(error){results.push(error.auralValidationFailure===true);};"
+                "console.log(JSON.stringify(results));"
+            )
+            completed = subprocess.run(
+                ['node', '--input-type=module', '--eval', script],
+                capture_output=True, text=True, check=False, timeout=10,
+            )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual(
+            ['resource_limit', 'resource_limit', True], json.loads(completed.stdout),
+        )
+
+    @unittest.skipUnless(
+        os.name == 'posix' and hasattr(os, 'mkfifo') and shutil.which('node'),
+        'actual Node FIFO check requires POSIX and Node.js',
+    )
+    def test_node_readers_reject_fifo_without_blocking(self):
+        provenance_uri = (ROOT / 'interop' / 'validate_provenance.mjs').as_uri()
+        aural_uri = (ROOT / 'interop' / 'validate_aural.mjs').as_uri()
+        with tempfile.TemporaryDirectory() as temporary:
+            fifo = Path(temporary) / 'input.fifo'
+            os.mkfifo(fifo)
+            script = (
+                f"import {{verifySignedEventFiles}} from {json.dumps(provenance_uri)};"
+                f"import {{verify}} from {json.dumps(aural_uri)};"
+                "const results=[];"
+                f"try{{await verifySignedEventFiles({json.dumps(str(fifo))},[]);}}"
+                "catch(error){results.push(error.category);};"
+                f"try{{await verify({json.dumps(str(fifo))});}}"
+                "catch(error){results.push(error.auralValidationFailure===true);};"
+                "console.log(JSON.stringify(results));"
+            )
+            completed = subprocess.run(
+                ['node', '--input-type=module', '--eval', script],
+                capture_output=True, text=True, check=False, timeout=5,
+            )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual(['resource_limit', True], json.loads(completed.stdout))
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js is not installed')
     def test_generator_is_deterministic_and_emits_no_private_seed(self):

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Independent validator for the experimental AURAL provenance signature v1 profile.
-import { open } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { lstat, open } from 'node:fs/promises';
 import { createHash, createPublicKey, verify as verifySignature } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { verifyDetailed as verifyAuralDetailed } from './validate_aural.mjs';
@@ -443,11 +444,47 @@ function sameSnapshot(before, after) {
     && before.mtimeNs === after.mtimeNs && before.ctimeNs === after.ctimeNs;
 }
 
+function safeOpenFlags(label) {
+  if (process.platform !== 'win32'
+      && (!Number.isInteger(constants.O_NONBLOCK)
+          || !Number.isInteger(constants.O_NOFOLLOW))) {
+    fail('input', `${label} cannot be opened safely on this platform`);
+  }
+  let flags = constants.O_RDONLY;
+  for (const flag of [constants.O_CLOEXEC, constants.O_NONBLOCK, constants.O_NOFOLLOW]) {
+    if (Number.isInteger(flag)) flags |= flag;
+  }
+  return flags;
+}
+
 async function readStableBoundedFile(filePath, maximum, label) {
-  const handle = await open(filePath, 'r');
+  let pathBefore;
+  try {
+    pathBefore = await lstat(filePath, { bigint: true });
+  } catch (error) {
+    fail('input', `${label} could not be inspected safely`);
+  }
+  if (pathBefore.isSymbolicLink() || !pathBefore.isFile()) {
+    fail('resource_limit', `${label} must be a regular, non-symbolic-link file`);
+  }
+
+  let handle;
+  try {
+    handle = await open(filePath, safeOpenFlags(label));
+  } catch (error) {
+    if (error?.category) throw error;
+    fail('input', `${label} could not be opened safely`);
+  }
+  let failed = false;
   try {
     const before = await handle.stat({ bigint: true });
-    if (!before.isFile() || before.size < 1n || before.size > BigInt(maximum)) {
+    if (!before.isFile()) {
+      fail('resource_limit', `${label} handle must identify a regular file`);
+    }
+    if (!sameSnapshot(pathBefore, before)) {
+      fail('input', `${label} changed while it was being opened`);
+    }
+    if (before.size < 1n || before.size > BigInt(maximum)) {
       fail('resource_limit', `${label} size or file type is invalid`);
     }
     const raw = Buffer.alloc(Number(before.size));
@@ -458,10 +495,27 @@ async function readStableBoundedFile(filePath, maximum, label) {
       offset += bytesRead;
     }
     const after = await handle.stat({ bigint: true });
-    if (!sameSnapshot(before, after)) fail('input', `${label} changed during reading`);
+    let pathAfter;
+    try {
+      pathAfter = await lstat(filePath, { bigint: true });
+    } catch (error) {
+      fail('input', `${label} changed or disappeared during reading`);
+    }
+    if (!after.isFile() || pathAfter.isSymbolicLink() || !pathAfter.isFile()
+        || !sameSnapshot(before, after) || !sameSnapshot(before, pathAfter)) {
+      fail('input', `${label} changed during reading`);
+    }
     return raw;
+  } catch (error) {
+    failed = true;
+    if (error?.category) throw error;
+    fail('input', `${label} could not be processed safely`);
   } finally {
-    await handle.close();
+    try {
+      await handle.close();
+    } catch (error) {
+      if (!failed) fail('input', `${label} could not be closed safely`);
+    }
   }
 }
 
