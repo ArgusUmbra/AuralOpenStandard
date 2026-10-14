@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Independent, dependency-free Draft 0.2 validator for classic (non-ZIP64) ZIP.
+// Independent, dependency-free Draft 0.2 validator for bounded classic and ZIP64 ZIP.
 import { open } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -13,10 +13,84 @@ const MAX_CENTRAL = 4 * 1024 ** 2;
 const IO_CHUNK = 1024 * 1024;
 const names = new Set(['manifest.json', 'audio/original.wav']);
 
-function fail(message) { throw new Error(message); }
+function fail(message) {
+  const error = new Error(message);
+  error.auralValidationFailure = true;
+  throw error;
+}
 function u16(b, p) { return b.readUInt16LE(p); }
 function u32(b, p) { return b.readUInt32LE(p); }
 function equal(a, b) { return a.length === b.length && a.equals(b); }
+function u64(b, p, description) {
+  const value = b.readBigUInt64LE(p);
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) fail(`unsafe ZIP64 ${description}`);
+  return Number(value);
+}
+function safeAdd(...values) {
+  let total = 0;
+  for (const value of values) {
+    if (!Number.isSafeInteger(value) || value < 0 || total > Number.MAX_SAFE_INTEGER - value) {
+      fail('unsafe ZIP offset arithmetic');
+    }
+    total += value;
+  }
+  return total;
+}
+
+function extraFields(extra) {
+  const fields = [];
+  let cursor = 0;
+  while (cursor < extra.length) {
+    if (cursor + 4 > extra.length) fail('malformed ZIP extra field');
+    const id = u16(extra, cursor), size = u16(extra, cursor + 2);
+    cursor += 4;
+    const end = cursor + size;
+    if (end > extra.length) fail('malformed ZIP extra field');
+    fields.push({ id, data: extra.subarray(cursor, end) });
+    cursor = end;
+  }
+  return fields;
+}
+
+function expandZip64(extra, values, central) {
+  const fields = extraFields(extra);
+  if (fields.some(field => field.id !== 0x0001)) {
+    fail(central ? 'central profile' : 'local/central mismatch');
+  }
+  const zip64 = fields.filter(field => field.id === 0x0001);
+  if (zip64.length > 1) fail('duplicate ZIP64 extra field');
+  const required = [
+    values.size === 0xffffffff,
+    values.compressed === 0xffffffff,
+    ...(central ? [values.localOffset === 0xffffffff, values.disk === 0xffff] : []),
+  ];
+  if (!required.some(Boolean)) {
+    if (zip64.length) fail('unnecessary ZIP64 extra field');
+    return { ...values, usesZip64: false };
+  }
+  if (zip64.length !== 1) fail('missing ZIP64 extra field');
+  const data = zip64[0].data;
+  let cursor = 0;
+  const take64 = description => {
+    if (cursor + 8 > data.length) fail('truncated ZIP64 extra field');
+    const value = u64(data, cursor, description);
+    cursor += 8;
+    return value;
+  };
+  const take32 = () => {
+    if (cursor + 4 > data.length) fail('truncated ZIP64 extra field');
+    const value = u32(data, cursor);
+    cursor += 4;
+    return value;
+  };
+  const expanded = { ...values, usesZip64: true };
+  if (required[0]) expanded.size = take64('uncompressed size');
+  if (required[1]) expanded.compressed = take64('compressed size');
+  if (central && required[2]) expanded.localOffset = take64('local-header offset');
+  if (central && required[3]) expanded.disk = take32();
+  if (cursor !== data.length) fail('oversized ZIP64 extra field');
+  return expanded;
+}
 
 const crcTable = Array.from({ length: 256 }, (_, value) => {
   let crc = value;
@@ -74,19 +148,24 @@ function checkString(text) {
   }
 }
 
-function canonical(value, depth = 1) {
-  if (depth > 32) fail('JSON depth');
+function canonical(value, containingDepth = 0) {
   if (value === null || typeof value === 'boolean') return JSON.stringify(value);
   if (typeof value === 'string') { checkString(value); return JSON.stringify(value); }
   if (typeof value === 'number') {
     if (!Number.isSafeInteger(value)) fail('number is not a safe integer');
     return JSON.stringify(value);
   }
-  if (Array.isArray(value)) return '[' + value.map(v => canonical(v, depth + 1)).join(',') + ']';
+  if (Array.isArray(value)) {
+    const depth = containingDepth + 1;
+    if (depth > 32) fail('JSON depth');
+    return '[' + value.map(v => canonical(v, depth)).join(',') + ']';
+  }
   if (typeof value === 'object') {
+    const depth = containingDepth + 1;
+    if (depth > 32) fail('JSON depth');
     return '{' + Object.keys(value).sort().map(key => {
       checkString(key);
-      return JSON.stringify(key) + ':' + canonical(value[key], depth + 1);
+      return JSON.stringify(key) + ':' + canonical(value[key], depth);
     }).join(',') + '}';
   }
   fail('unsupported JSON value');
@@ -147,14 +226,56 @@ async function parseZip(reader) {
   const end = reader.size - 22;
   const eocd = await reader.readExact(end, 22, 'end of central directory');
   if (u32(eocd, 0) !== 0x06054b50 || u16(eocd, 20) !== 0) fail('terminal EOCD');
-  if (u16(eocd, 4) !== 0 || u16(eocd, 6) !== 0) fail('multi-disk');
-  const count = u16(eocd, 10), diskCount = u16(eocd, 8);
-  const centralSize = u32(eocd, 12), centralOffset = u32(eocd, 16);
-  if ([count, diskCount].includes(0xffff) || [centralSize, centralOffset].includes(0xffffffff)) {
-    fail('ZIP64 unsupported by minimal validator');
+  const classic = {
+    disk: u16(eocd, 4), centralDisk: u16(eocd, 6), diskCount: u16(eocd, 8),
+    count: u16(eocd, 10), centralSize: u32(eocd, 12), centralOffset: u32(eocd, 16),
+  };
+  const usesZip64 = classic.disk === 0xffff || classic.centralDisk === 0xffff
+    || classic.diskCount === 0xffff || classic.count === 0xffff
+    || classic.centralSize === 0xffffffff || classic.centralOffset === 0xffffffff;
+  let { disk, centralDisk, diskCount, count, centralSize, centralOffset } = classic;
+  let directoryEnd = end;
+  if (usesZip64) {
+    const locatorOffset = end - 20;
+    if (locatorOffset < 0) fail('missing ZIP64 locator');
+    const locator = await reader.readExact(locatorOffset, 20, 'ZIP64 locator');
+    if (u32(locator, 0) !== 0x07064b50) fail('missing ZIP64 locator');
+    const locatorDisk = u32(locator, 4);
+    const zip64Offset = u64(locator, 8, 'end-record offset');
+    const totalDisks = u32(locator, 16);
+    if (locatorDisk !== 0 || totalDisks !== 1) fail('multi-disk ZIP64');
+    if (safeAdd(zip64Offset, 56) > locatorOffset) fail('invalid ZIP64 end-record offset');
+    const zip64 = await reader.readExact(zip64Offset, 56, 'ZIP64 end record');
+    if (u32(zip64, 0) !== 0x06064b50) fail('missing ZIP64 end record');
+    const recordSize = u64(zip64, 4, 'end-record size');
+    if (recordSize !== 44 || safeAdd(zip64Offset, 12, recordSize) !== locatorOffset) {
+      fail('invalid ZIP64 end-record size or layout');
+    }
+    const needed = u16(zip64, 14);
+    disk = u32(zip64, 16);
+    centralDisk = u32(zip64, 20);
+    diskCount = u64(zip64, 24, 'disk entry count');
+    count = u64(zip64, 32, 'entry count');
+    centralSize = u64(zip64, 40, 'central-directory size');
+    centralOffset = u64(zip64, 48, 'central-directory offset');
+    if (needed !== 45) fail('ZIP64 end record must require version 4.5');
+    if (disk !== 0 || centralDisk !== 0) fail('multi-disk ZIP64');
+    if (diskCount !== count) fail('contradictory ZIP64 entry counts');
+    const comparisons = [
+      [classic.disk, disk, 0xffff], [classic.centralDisk, centralDisk, 0xffff],
+      [classic.diskCount, diskCount, 0xffff], [classic.count, count, 0xffff],
+      [classic.centralSize, centralSize, 0xffffffff],
+      [classic.centralOffset, centralOffset, 0xffffffff],
+    ];
+    if (comparisons.some(([oldValue, value, sentinel]) => oldValue !== sentinel && oldValue !== value)) {
+      fail('classic and ZIP64 end records disagree');
+    }
+    directoryEnd = zip64Offset;
+  } else if (disk !== 0 || centralDisk !== 0 || diskCount !== count) {
+    fail('multi-disk or contradictory ZIP metadata');
   }
   if (count !== 2 || diskCount !== count || centralSize > MAX_CENTRAL
-      || centralOffset + centralSize !== end) fail('central directory envelope');
+      || safeAdd(centralOffset, centralSize) !== directoryEnd) fail('central directory envelope');
   const central = await reader.readExact(centralOffset, centralSize, 'central directory');
   const entries = [];
   let cursor = 0;
@@ -162,35 +283,56 @@ async function parseZip(reader) {
     if (cursor + 46 > central.length || u32(central, cursor) !== 0x02014b50) fail('central header');
     const needed = u16(central, cursor + 6), flags = u16(central, cursor + 8);
     const method = u16(central, cursor + 10), time = u16(central, cursor + 12), date = u16(central, cursor + 14);
-    const crc = u32(central, cursor + 16), compressed = u32(central, cursor + 20), size = u32(central, cursor + 24);
+    const crc = u32(central, cursor + 16);
+    const classicCompressed = u32(central, cursor + 20), classicSize = u32(central, cursor + 24);
     const nameLen = u16(central, cursor + 28), extraLen = u16(central, cursor + 30), commentLen = u16(central, cursor + 32);
-    const disk = u16(central, cursor + 34), external = u32(central, cursor + 38), localOffset = u32(central, cursor + 42);
+    const classicDisk = u16(central, cursor + 34), external = u32(central, cursor + 38);
+    const classicLocalOffset = u32(central, cursor + 42);
     const next = cursor + 46 + nameLen + extraLen + commentLen;
-    if ([compressed, size, localOffset].includes(0xffffffff) || disk === 0xffff) {
-      fail('ZIP64 unsupported by minimal validator');
+    if (next > central.length || commentLen || ![0, 0x800].includes(flags) || method !== 0) {
+      fail('central profile');
     }
-    if (next > central.length || disk !== 0 || extraLen || commentLen || ![0, 0x800].includes(flags)
-        || method !== 0 || compressed !== size || ![10, 20].includes(needed)) fail('central profile');
     const rawName = central.subarray(cursor + 46, cursor + 46 + nameLen);
+    const centralExtra = central.subarray(cursor + 46 + nameLen, cursor + 46 + nameLen + extraLen);
+    const expanded = expandZip64(centralExtra, {
+      size: classicSize, compressed: classicCompressed,
+      localOffset: classicLocalOffset, disk: classicDisk,
+    }, true);
+    const { size, compressed, localOffset, disk } = expanded;
+    if (disk !== 0 || compressed !== size || ![10, 20, 45].includes(needed)
+        || (expanded.usesZip64 && needed !== 45)) fail('central profile');
     if (rawName.some(byte => byte > 0x7f)) fail('non-ASCII name');
     const name = rawName.toString('ascii');
     const modeType = (external >>> 16) & 0xf000;
     if (!names.has(name) || ![0, 0x8000].includes(modeType) || (external & 0x10)) fail('name or file type');
-    if (localOffset + 30 > centralOffset) fail('local header');
+    if ((name === 'manifest.json' && size > MAX_MANIFEST)
+        || (name === 'audio/original.wav' && size > MAX_AUDIO)) fail('entry size limit');
+    if (safeAdd(localOffset, 30) > centralOffset) fail('local header');
     const local = await reader.readExact(localOffset, 30, 'local header');
     if (u32(local, 0) !== 0x04034b50) fail('local header');
     const localNeeded = u16(local, 4), localFlags = u16(local, 6);
     const localMethod = u16(local, 8), localTime = u16(local, 10), localDate = u16(local, 12);
-    const localCrc = u32(local, 14), localCompressed = u32(local, 18), localSize = u32(local, 22);
+    const localCrc = u32(local, 14);
+    const classicLocalCompressed = u32(local, 18), classicLocalSize = u32(local, 22);
     const localNameLen = u16(local, 26), localExtraLen = u16(local, 28);
-    if ([localCompressed, localSize].includes(0xffffffff)) fail('ZIP64 unsupported by minimal validator');
-    if (localExtraLen || localOffset + 30 + localNameLen > centralOffset) fail('local/central mismatch');
+    const localHeaderEnd = safeAdd(localOffset, 30, localNameLen, localExtraLen);
+    if (localHeaderEnd > centralOffset) fail('local/central mismatch');
     const localName = await reader.readExact(localOffset + 30, localNameLen, 'local member name');
+    const localExtra = await reader.readExact(
+      safeAdd(localOffset, 30, localNameLen), localExtraLen, 'local extra field',
+    );
+    const localExpanded = expandZip64(localExtra, {
+      size: classicLocalSize, compressed: classicLocalCompressed,
+    }, false);
+    const localCompressed = localExpanded.compressed, localSize = localExpanded.size;
     if (!equal(rawName, localName) || localNeeded !== needed || localFlags !== flags
         || localMethod !== method || localTime !== time || localDate !== date || localCrc !== crc
-        || localCompressed !== compressed || localSize !== size) fail('local/central mismatch');
-    const dataStart = localOffset + 30 + localNameLen;
-    const dataEnd = dataStart + size;
+        || localCompressed !== compressed || localSize !== size
+        || ((expanded.usesZip64 || localExpanded.usesZip64) && needed !== 45)) {
+      fail('local/central mismatch');
+    }
+    const dataStart = localHeaderEnd;
+    const dataEnd = safeAdd(dataStart, size);
     if (dataEnd > centralOffset) fail('entry overlaps central directory');
     entries.push({ name, localOffset, dataStart, dataEnd, size, crc });
     cursor = next;

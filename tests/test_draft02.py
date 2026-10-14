@@ -10,7 +10,7 @@ import wave
 import zipfile
 
 from aural import core
-from aural.core import AuralError, canonical_json, extract, package, verify
+from aural.core import AuralError, canonical_json, extract, package, verify, verify_detailed
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +18,13 @@ CORPUS = ROOT / 'tests' / 'fixtures' / 'conformance'
 
 
 class Draft02Tests(unittest.TestCase):
+    @staticmethod
+    def rewrite_manifest(source, destination, manifest):
+        with zipfile.ZipFile(source) as existing, zipfile.ZipFile(destination, 'w') as output:
+            for name in existing.namelist():
+                payload = manifest if name == 'manifest.json' else existing.read(name)
+                output.writestr(name, payload, compress_type=zipfile.ZIP_STORED)
+
     def test_corpus_hashes_and_python_outcomes(self):
         expected = json.loads((CORPUS / 'expected.json').read_text(encoding='utf-8'))
         for name, case in expected['fixtures'].items():
@@ -49,6 +56,38 @@ class Draft02Tests(unittest.TestCase):
         # RFC 8785 orders the supplementary key's UTF-16 surrogate before U+E000.
         self.assertLess(raw.index('𝄞'.encode()), raw.index('\ue000'.encode()))
 
+    def test_python_detailed_api_is_explicit_and_verify_contract_is_unchanged(self):
+        fixture = CORPUS / 'valid-unicode.aural'
+        basic = verify(fixture)
+        detailed = verify_detailed(fixture)
+        self.assertEqual(
+            {'status', 'version', 'legacy', 'audio_sha256', 'audio_bytes', 'warning'},
+            set(basic),
+        )
+        self.assertEqual(
+            {
+                'status', 'format', 'version', 'manifest_sha256', 'original_path',
+                'audio_sha256', 'audio_bytes',
+            },
+            set(detailed),
+        )
+        self.assertEqual('org.aural.audio-evidence', detailed['format'])
+        self.assertEqual('0.2-draft', detailed['version'])
+        self.assertEqual('audio/original.wav', detailed['original_path'])
+        self.assertEqual(
+            '83ff69181aa5a1eb7b04a042eee89081a155a61736838615444f60c95672c3da',
+            detailed['manifest_sha256'],
+        )
+        shared = ('status', 'version', 'audio_sha256', 'audio_bytes')
+        self.assertEqual(
+            {key: detailed[key] for key in shared},
+            {key: basic[key] for key in shared},
+        )
+
+        self.assertTrue(verify(CORPUS / 'legacy-0.1.aural')['legacy'])
+        with self.assertRaisesRegex(AuralError, 'Draft 0.2'):
+            verify_detailed(CORPUS / 'legacy-0.1.aural')
+
     def test_writer_is_v02_and_preserves_original_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -78,6 +117,55 @@ class Draft02Tests(unittest.TestCase):
                 '2026-10-13T18:00:00+14:01'):
             with self.subTest(value=invalid):
                 self.assertFalse(core._valid_rfc3339(invalid))
+
+    @unittest.skipUnless(shutil.which('node'), 'Node.js is not installed')
+    def test_manifest_container_depth_boundary_agrees_across_validators(self):
+        with zipfile.ZipFile(CORPUS / 'valid-minimal.aural') as archive:
+            base = json.loads(archive.read('manifest.json'))
+
+        manifests = {}
+        for depth, nested_arrays in ((32, 30), (33, 31)):
+            document = dict(base)
+            value = 'leaf'
+            for _ in range(nested_arrays):
+                value = [value]
+            document['extensions'] = {'urn:test:depth': value}
+            manifests[depth] = core._jcs_text(document).encode('utf-8')
+
+        core._raw_json_depth(manifests[32])
+        core._check_ijson(json.loads(manifests[32]))
+        with self.assertRaisesRegex(AuralError, 'nesting'):
+            core._raw_json_depth(manifests[33])
+        with self.assertRaisesRegex(AuralError, 'nesting'):
+            core._check_ijson(json.loads(manifests[33]))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            packages = {}
+            for depth, manifest in manifests.items():
+                packages[depth] = root / f'depth-{depth}.aural'
+                self.rewrite_manifest(
+                    CORPUS / 'valid-minimal.aural', packages[depth], manifest,
+                )
+
+            self.assertEqual('integrity_valid', verify(packages[32])['status'])
+            with self.assertRaisesRegex(AuralError, 'nesting'):
+                verify(packages[33])
+
+            validator = ROOT / 'interop' / 'validate_aural.mjs'
+            accepted = subprocess.run(
+                ['node', str(validator), str(packages[32])],
+                capture_output=True, text=True, check=False, timeout=20,
+            )
+            rejected = subprocess.run(
+                ['node', str(validator), str(packages[33])],
+                capture_output=True, text=True, check=False, timeout=20,
+            )
+            self.assertEqual(0, accepted.returncode, accepted.stderr)
+            self.assertEqual(1, rejected.returncode)
+            self.assertIn('JSON depth', rejected.stderr)
+
+        self.assertTrue(verify(CORPUS / 'legacy-0.1.aural')['legacy'])
 
     def test_manifest_size_checked_before_json_parse(self):
         with self.assertRaisesRegex(AuralError, 'size'):
@@ -156,6 +244,7 @@ class Draft02Tests(unittest.TestCase):
             set(detailed),
         )
         self.assertEqual({key: detailed[key] for key in basic}, basic)
+        self.assertEqual(verify_detailed(Path(fixture)), detailed)
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js is not installed')
     def test_node_rejects_oversized_file_before_bulk_read(self):

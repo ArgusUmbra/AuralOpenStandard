@@ -134,20 +134,23 @@ class ProvenanceFoundationTests(unittest.TestCase):
             with self.subTest(limit=label):
                 self.assert_error(provenance.ErrorCategory.RESOURCE_LIMIT, operation)
 
-    def test_interfaces_never_report_placeholder_success(self):
+    def test_interfaces_return_signature_results_and_missing_package_fails_closed(self):
         event = CORPUS / 'valid-original-acquired.json'
         key = CORPUS / 'valid-key.json'
-        error = self.assert_error(
-            provenance.ErrorCategory.NOT_IMPLEMENTED,
-            lambda: provenance.verify_signed_event(event.read_bytes(), [key.read_bytes()]),
-        )
-        self.assertEqual(provenance.VerificationStage.SIGNATURE, error.stage)
+        direct = provenance.verify_signed_event(event.read_bytes(), [key.read_bytes()])
+        files = provenance.verify_signed_event_files(event, [key])
+        self.assertEqual(provenance.VerificationStatus.SIGNATURE_VALID, direct.status)
+        self.assertEqual(direct, files)
 
-        error = self.assert_error(
-            provenance.ErrorCategory.NOT_IMPLEMENTED,
-            lambda: provenance.verify_signed_event_files(event, [key]),
-        )
-        self.assertEqual(provenance.VerificationStage.SIGNATURE, error.stage)
+        for operation in (
+                lambda: provenance.verify_signed_event(
+                    event.read_bytes(), [key.read_bytes()], package_path='missing.aural',
+                ),
+                lambda: provenance.verify_signed_event_files(
+                    event, [key], package_path='missing.aural',
+                )):
+            error = self.assert_error(provenance.ErrorCategory.PACKAGE_INTEGRITY, operation)
+            self.assertEqual(provenance.VerificationStage.PACKAGE, error.stage)
 
     def test_oversized_files_are_rejected_before_bulk_read(self):
         with tempfile.TemporaryDirectory() as temporary:

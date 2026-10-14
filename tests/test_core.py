@@ -3,6 +3,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
+import stat
 import struct
 import tempfile
 import unittest
@@ -189,6 +191,125 @@ class CoreTests(unittest.TestCase):
                 verify(self.pkg)
         with mock.patch.object(core, 'MAX_ARCHIVE_SIZE', size):
             self.assertEqual('integrity_valid', verify(self.pkg)['status'])
+
+    def test_package_path_requires_regular_nonsymlink_file(self):
+        self.assertEqual('integrity_valid', verify(self.pkg)['status'])
+        with self.pkg.open('rb') as source:
+            self.assertEqual('integrity_valid', verify(source)['status'])
+            self.assertFalse(source.closed)
+
+        with self.assertRaisesRegex(AuralError, 'regular file'):
+            verify(self.d)
+
+        link = self.d / 'package-link.aural'
+        try:
+            link.symlink_to(self.pkg)
+        except OSError:
+            symbolic = mock.Mock(st_mode=stat.S_IFLNK)
+            with mock.patch.object(core.os, 'lstat', return_value=symbolic), \
+                    mock.patch.object(core.os, 'open') as opened:
+                with self.assertRaisesRegex(AuralError, 'symbolic link'):
+                    verify(link)
+                opened.assert_not_called()
+        else:
+            with self.assertRaisesRegex(AuralError, 'symbolic link'):
+                verify(link)
+
+    def test_fifo_is_rejected_without_opening_where_supported(self):
+        fifo = self.d / 'package.fifo'
+        if hasattr(os, 'mkfifo'):
+            try:
+                os.mkfifo(fifo)
+            except OSError:
+                pass
+            else:
+                with self.assertRaisesRegex(AuralError, 'regular file'):
+                    verify(fifo)
+                return
+
+        nonregular = mock.Mock(st_mode=stat.S_IFIFO)
+        with mock.patch.object(core.os, 'lstat', return_value=nonregular), \
+                mock.patch.object(core.os, 'open') as opened:
+            with self.assertRaisesRegex(AuralError, 'regular file'):
+                verify(fifo)
+            opened.assert_not_called()
+
+    def test_same_path_replacement_is_detected_or_prevented(self):
+        victim = self.d / 'replacement-target.aural'
+        replacement = self.d / 'replacement.aural'
+        shutil.copyfile(self.pkg, victim)
+        shutil.copyfile(self.pkg, replacement)
+        original_verify = core._verify_archive
+        outcome = {'replaced': False, 'blocked': False}
+
+        def replace_after_verification(*args, **kwargs):
+            result = original_verify(*args, **kwargs)
+            try:
+                os.replace(replacement, victim)
+            except OSError:
+                outcome['blocked'] = True
+            else:
+                outcome['replaced'] = True
+            return result
+
+        with mock.patch.object(core, '_verify_archive', side_effect=replace_after_verification):
+            try:
+                result = verify(victim)
+            except AuralError as exc:
+                self.assertTrue(outcome['replaced'])
+                self.assertIn('changed during verification', str(exc))
+            else:
+                self.assertTrue(outcome['blocked'])
+                self.assertEqual('integrity_valid', result['status'])
+
+    def test_in_place_change_is_detected_or_prevented(self):
+        victim = self.d / 'modified-during-verification.aural'
+        shutil.copyfile(self.pkg, victim)
+        original_verify = core._verify_archive
+        outcome = {'modified': False, 'blocked': False}
+
+        def modify_after_verification(*args, **kwargs):
+            result = original_verify(*args, **kwargs)
+            try:
+                with victim.open('r+b') as changed:
+                    first = changed.read(1)
+                    changed.seek(0)
+                    changed.write(bytes([first[0] ^ 1]))
+                    changed.flush()
+                    os.fsync(changed.fileno())
+                outcome['modified'] = True
+            except OSError:
+                outcome['blocked'] = True
+            return result
+
+        with mock.patch.object(core, '_verify_archive', side_effect=modify_after_verification):
+            try:
+                result = verify(victim)
+            except AuralError as exc:
+                self.assertTrue(outcome['modified'])
+                self.assertIn('changed during verification', str(exc))
+            else:
+                self.assertTrue(outcome['blocked'])
+                self.assertEqual('integrity_valid', result['status'])
+
+    def test_truncated_error_closes_the_verified_handle(self):
+        truncated = self.d / 'truncated.aural'
+        payload = self.pkg.read_bytes()
+        truncated.write_bytes(payload[:len(payload) // 2])
+        real_open = os.open
+        descriptors = []
+
+        def tracked_open(*args, **kwargs):
+            descriptor = real_open(*args, **kwargs)
+            descriptors.append(descriptor)
+            return descriptor
+
+        with mock.patch.object(core.os, 'open', side_effect=tracked_open):
+            with self.assertRaises(AuralError):
+                verify(truncated)
+        self.assertEqual(1, len(descriptors))
+        with self.assertRaises(OSError):
+            os.fstat(descriptors[0])
 
     def test_excessive_declared_entry_count_rejected_before_zipfile_parsing(self):
         payload = bytearray(self.pkg.read_bytes())

@@ -1,5 +1,5 @@
 """AURAL Draft 0.2 writer and verifier with a distinct Draft 0.1 path."""
-from contextlib import nullcontext
+from contextlib import contextmanager
 from datetime import datetime
 import hashlib
 import json
@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import struct
 import tempfile
 import zipfile
@@ -58,9 +59,7 @@ def _invalid_scalar(text):
     return False
 
 
-def _check_ijson(value, depth=0):
-    if depth > MAX_JSON_DEPTH:
-        raise AuralError('Manifest nesting exceeds Draft 0.2 limit')
+def _check_ijson(value, containing_depth=0):
     if value is None or isinstance(value, bool):
         return
     if type(value) is int:
@@ -74,14 +73,20 @@ def _check_ijson(value, depth=0):
             raise AuralError('JSON strings must contain Unicode scalar values')
         return
     if isinstance(value, list):
+        depth = containing_depth + 1
+        if depth > MAX_JSON_DEPTH:
+            raise AuralError('Manifest nesting exceeds Draft 0.2 limit')
         for item in value:
-            _check_ijson(item, depth + 1)
+            _check_ijson(item, depth)
         return
     if isinstance(value, dict):
+        depth = containing_depth + 1
+        if depth > MAX_JSON_DEPTH:
+            raise AuralError('Manifest nesting exceeds Draft 0.2 limit')
         for key, item in value.items():
             if not isinstance(key, str) or _invalid_scalar(key):
                 raise AuralError('JSON object names must contain Unicode scalar values')
-            _check_ijson(item, depth + 1)
+            _check_ijson(item, depth)
         return
     raise AuralError('Value is not representable as interoperable JSON')
 
@@ -113,7 +118,7 @@ def _jcs_text(value):
 
 def canonical_json(value):
     """Return RFC 8785 bytes for the Draft 0.2 integer-only I-JSON profile."""
-    _check_ijson(value, 1)
+    _check_ijson(value)
     return _jcs_text(value).encode('utf-8')
 
 
@@ -218,10 +223,70 @@ def _safe_name(name):
             and all(segment not in ('', '.', '..') for segment in name.split('/')))
 
 
+def _file_snapshot(metadata):
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+@contextmanager
 def _archive_source(path):
+    """Yield one stable package handle; caller-owned file-like inputs are unchanged.
+
+    Path inputs must remain the same regular, non-symlink file for the complete
+    operation. Metadata checks detect ordinary replacement and modification,
+    but cannot defend against a hostile filesystem that restores metadata.
+    """
     if hasattr(path, 'read') and hasattr(path, 'seek'):
-        return nullcontext(path)
-    return open(path, 'rb')
+        yield path
+        return
+
+    try:
+        path_before = os.lstat(path)
+    except (OSError, TypeError, ValueError) as exc:
+        raise AuralError(f'Cannot inspect AURAL package path: {exc}') from exc
+    if stat.S_ISLNK(path_before.st_mode):
+        raise AuralError('AURAL package path must not be a symbolic link')
+    if not stat.S_ISREG(path_before.st_mode):
+        raise AuralError('AURAL package path must identify a regular file')
+
+    flags = os.O_RDONLY
+    for name in ('O_BINARY', 'O_CLOEXEC', 'O_NOINHERIT', 'O_NONBLOCK', 'O_NOFOLLOW'):
+        flags |= getattr(os, name, 0)
+    try:
+        descriptor = os.open(path, flags)
+    except (OSError, TypeError, ValueError) as exc:
+        raise AuralError(f'Cannot open AURAL package path safely: {exc}') from exc
+
+    try:
+        handle_before = os.fstat(descriptor)
+        if not stat.S_ISREG(handle_before.st_mode):
+            raise AuralError('AURAL package handle must identify a regular file')
+        if _file_snapshot(path_before) != _file_snapshot(handle_before):
+            raise AuralError('AURAL package changed while it was being opened')
+
+        with open(descriptor, 'rb', closefd=True) as source:
+            descriptor = None
+            yield source
+            try:
+                handle_after = os.fstat(source.fileno())
+                path_after = os.lstat(path)
+            except OSError as exc:
+                raise AuralError(
+                    f'AURAL package changed or disappeared during verification: {exc}'
+                ) from exc
+            if (stat.S_ISLNK(path_after.st_mode)
+                    or not stat.S_ISREG(path_after.st_mode)
+                    or _file_snapshot(handle_before) != _file_snapshot(handle_after)
+                    or _file_snapshot(handle_before) != _file_snapshot(path_after)):
+                raise AuralError('AURAL package changed during verification')
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def _read_exact(source, size, description):
@@ -585,7 +650,7 @@ def _parse_v02_manifest(raw, initial_document):
     document = _load_json(raw, strict_v02=True)
     if document != initial_document:
         raise AuralError('Manifest parsing was inconsistent')
-    _check_ijson(document, 1)
+    _check_ijson(document)
     if not isinstance(document, dict):
         raise AuralError('Draft 0.2 manifest must be an object')
     keys = set(document)
@@ -714,7 +779,7 @@ def _validate_v02_zip(preflight):
             raise AuralError('ZIP members must describe regular files')
 
 
-def _verify_archive(archive, preflight, audio_target=None):
+def _verify_archive(archive, preflight, audio_target=None, *, detailed=False):
     infos = archive.infolist()
     expected_names = [entry['name'] for entry in preflight['entries']]
     names = [info.filename for info in infos]
@@ -763,28 +828,59 @@ def _verify_archive(archive, preflight, audio_target=None):
             digest.update(block)
             if audio_target is not None:
                 audio_target.write(block)
-    if digest.hexdigest() != asset['sha256']:
+    audio_sha256 = digest.hexdigest()
+    if audio_sha256 != asset['sha256']:
         raise AuralError('SHA-256 mismatch: audio modified or corrupt')
     warning = ('No source authenticity, signer identity, or chain-of-custody '
                f'verification in {version}')
-    return {'status': 'integrity_valid', 'version': version,
-            'legacy': version == LEGACY_VERSION,
-            'audio_sha256': asset['sha256'], 'audio_bytes': info.file_size,
-            'warning': warning}
+    if detailed:
+        if version != VERSION:
+            raise AuralError('Detailed package verification requires AURAL Draft 0.2')
+        return {
+            'status': 'integrity_valid',
+            'format': _document['format'],
+            'version': version,
+            'manifest_sha256': hashlib.sha256(manifest_raw).hexdigest(),
+            'original_path': asset['path'],
+            'audio_sha256': audio_sha256,
+            'audio_bytes': info.file_size,
+        }
+    return {
+        'status': 'integrity_valid',
+        'version': version,
+        'legacy': version == LEGACY_VERSION,
+        'audio_sha256': audio_sha256,
+        'audio_bytes': info.file_size,
+        'warning': warning,
+    }
 
 
-def verify(path):
-    """Verify structure, canonical manifest bytes, CRC32, and payload SHA-256."""
+def _verify_path(path, *, detailed):
     try:
         with _archive_source(path) as source:
             preflight = _preflight_archive(source)
             source.seek(0)
             with zipfile.ZipFile(source, 'r', allowZip64=True) as archive:
-                return _verify_archive(archive, preflight)
+                return _verify_archive(archive, preflight, detailed=detailed)
     except AuralError:
         raise
     except INVALID_PACKAGE_ERRORS as exc:
         raise AuralError(f'Invalid AURAL package: {exc}') from exc
+
+
+def verify(path):
+    """Verify structure, canonical manifest bytes, CRC32, and payload SHA-256.
+
+    Filesystem paths must name stable regular files and must not be symlinks.
+    Caller-owned seekable file-like inputs remain supported without path-based
+    type or metadata-stability checks.
+    """
+    return _verify_path(path, detailed=False)
+
+
+def verify_detailed(path):
+    """Verify Draft 0.2 and return independently derived binding metadata."""
+    return _verify_path(path, detailed=True)
 
 
 def extract(path, destination):

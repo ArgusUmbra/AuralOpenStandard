@@ -491,7 +491,14 @@ export async function verifySignedEventFiles(
   }
   const result = verifySignedEvent(recordRaw, keyRecordRaws);
   if (packagePath !== undefined) {
-    const asset = await verifyAuralDetailed(packagePath);
+    let asset;
+    try {
+      asset = await verifyAuralDetailed(packagePath);
+    } catch (error) {
+      const detail = error?.auralValidationFailure === true
+        ? error.message : 'package input could not be verified';
+      fail('package_integrity', `AURAL package verification failed: ${detail}`);
+    }
     const subject = result.assertion.subject;
     if (asset.version !== subject.version || asset.format !== subject.format
         || asset.manifest_sha256 !== subject.manifest_sha256
