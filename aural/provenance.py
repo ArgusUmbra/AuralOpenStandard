@@ -9,6 +9,7 @@ from datetime import date
 from enum import Enum
 from functools import lru_cache
 import hashlib
+import heapq
 import json
 import os
 from pathlib import Path
@@ -245,7 +246,11 @@ class VerificationLimits:
 
 @dataclass(frozen=True, slots=True)
 class GraphVerificationLimits(VerificationLimits):
-    """Bound graph preflight work without relaxing single-event limits."""
+    """Bound graph preflight work without relaxing single-event limits.
+
+    ``graph_depth`` counts nodes on the longest parent-to-descendant path;
+    a root by itself therefore has depth one.
+    """
 
     event_records: int = MAX_GRAPH_EVENT_RECORDS
     aggregate_event_bytes: int = MAX_AGGREGATE_GRAPH_EVENT_BYTES
@@ -309,6 +314,17 @@ class _IndexedSignedRecord:
 class _SignedEventIndex:
     by_event_id: dict
     duplicate_signed_records: int
+
+
+@dataclass(frozen=True, slots=True)
+class _ResolvedSignedEventGraph:
+    """Unique records in deterministic parent-first order.
+
+    ``maximum_depth`` counts nodes, so every root has depth one.
+    """
+
+    records: Tuple[_IndexedSignedRecord, ...]
+    maximum_depth: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -1223,6 +1239,85 @@ def _index_signed_event_records(records, limits=None):
     return _SignedEventIndex(by_event_id, duplicates)
 
 
+def _resolve_signed_event_graph(index, limits=None):
+    """Resolve exact parent identities and return a bounded DAG ordering."""
+    effective = _graph_limits_or_default(limits)
+    if not isinstance(index, _SignedEventIndex):
+        _fail(
+            ErrorCategory.CONFIGURATION,
+            VerificationStage.INPUT,
+            'index must be a _SignedEventIndex',
+        )
+
+    event_ids = sorted(index.by_event_id)
+    children = {event_id: [] for event_id in event_ids}
+    parent_counts = {}
+
+    for event_id in event_ids:
+        item = index.by_event_id[event_id]
+        parents = item.validated.assertion['parents']
+        if len(parents) > effective.parent_fanout:
+            _fail(
+                ErrorCategory.RESOURCE_LIMIT,
+                VerificationStage.GRAPH,
+                'event parent fanout exceeds the configured limit',
+            )
+        parent_counts[event_id] = len(parents)
+        for reference in parents:
+            parent_id = reference['event_id']
+            parent = index.by_event_id.get(parent_id)
+            if parent is None:
+                _fail(
+                    ErrorCategory.MISSING_PARENT,
+                    VerificationStage.GRAPH,
+                    'declared parent event_id is absent',
+                )
+            referenced_digest = reference['signed_event_digest']['value']
+            if parent.signed_event_sha256 != referenced_digest:
+                _fail(
+                    ErrorCategory.PARENT_DIGEST_MISMATCH,
+                    VerificationStage.GRAPH,
+                    'declared parent digest does not match the indexed event',
+                )
+            children[parent_id].append(event_id)
+
+    eligible = [event_id for event_id in event_ids if parent_counts[event_id] == 0]
+    heapq.heapify(eligible)
+    depths = {event_id: 1 for event_id in eligible}
+    ordered = []
+    maximum_depth = 0
+    depth_exceeded = False
+
+    while eligible:
+        event_id = heapq.heappop(eligible)
+        ordered.append(index.by_event_id[event_id])
+        depth = depths[event_id]
+        maximum_depth = max(maximum_depth, depth)
+        if depth > effective.graph_depth:
+            depth_exceeded = True
+
+        for child_id in children[event_id]:
+            depths[child_id] = max(depths.get(child_id, 1), depth + 1)
+            parent_counts[child_id] -= 1
+            if parent_counts[child_id] == 0:
+                heapq.heappush(eligible, child_id)
+
+    if len(ordered) != len(event_ids):
+        _fail(
+            ErrorCategory.CYCLE,
+            VerificationStage.GRAPH,
+            'signed-event parent graph contains a directed cycle',
+        )
+    if depth_exceeded:
+        _fail(
+            ErrorCategory.RESOURCE_LIMIT,
+            VerificationStage.GRAPH,
+            'graph depth exceeds the configured limit',
+        )
+
+    return _ResolvedSignedEventGraph(tuple(ordered), maximum_depth)
+
+
 def verify_signed_event(
         record: bytes,
         public_key_records: Sequence[bytes],
@@ -1412,7 +1507,8 @@ def verify_signed_event_graph(
                 'aggregate public-key data exceeds the configured limit',
             )
 
-    _index_signed_event_records(records, effective)
+    index = _index_signed_event_records(records, effective)
+    _resolve_signed_event_graph(index, effective)
     raise ProvenanceVerificationError(
         ErrorCategory.NOT_IMPLEMENTED,
         VerificationStage.GRAPH,
