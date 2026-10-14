@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 import re
 import stat
-from typing import BinaryIO, Optional, Union
+from typing import BinaryIO, Optional, Tuple, Union
 
 from . import core
 
@@ -29,6 +29,10 @@ MAX_AUDIO_BYTES = 8 * 1024**3
 MAX_SAFE_INTEGER = 9007199254740991
 MAX_EXTENSION_ID_BYTES = 255
 MAX_DESCRIPTION_SCALARS = 4096
+MAX_GRAPH_EVENT_RECORDS = 4096
+MAX_AGGREGATE_GRAPH_EVENT_BYTES = 64 * 1024 * 1024
+MAX_GRAPH_PARENT_REFERENCES = 64
+MAX_GRAPH_DEPTH = 256
 READ_CHUNK = 64 * 1024
 
 EVENT_SCHEMA = 'org.aural.provenance-event'
@@ -149,6 +153,14 @@ class HistoryCompletenessStatus(str, Enum):
     NOT_ESTABLISHED = 'not_established'
 
 
+class GraphVerificationStatus(str, Enum):
+    CONSISTENT = 'consistent'
+
+
+class ParentClosureStatus(str, Enum):
+    CLOSED = 'closed'
+
+
 class ErrorCategory(str, Enum):
     CONFIGURATION = 'configuration'
     INPUT = 'input'
@@ -174,6 +186,11 @@ class ErrorCategory(str, Enum):
     PROVIDER_UNAVAILABLE = 'provider_unavailable'
     PACKAGE_INTEGRITY = 'package_integrity'
     SUBJECT_BINDING = 'subject_binding'
+    EVENT_ID_COLLISION = 'event_id_collision'
+    SIGNED_EVENT_DIGEST_COLLISION = 'signed_event_digest_collision'
+    MISSING_PARENT = 'missing_parent'
+    PARENT_DIGEST_MISMATCH = 'parent_digest_mismatch'
+    CYCLE = 'cycle'
     NOT_IMPLEMENTED = 'not_implemented'
 
 
@@ -183,6 +200,7 @@ class VerificationStage(str, Enum):
     KEY = 'key'
     SIGNATURE = 'signature'
     PACKAGE = 'package'
+    GRAPH = 'graph'
 
 
 class ProvenanceVerificationError(ValueError):
@@ -226,6 +244,30 @@ class VerificationLimits:
 
 
 @dataclass(frozen=True, slots=True)
+class GraphVerificationLimits(VerificationLimits):
+    """Bound graph preflight work without relaxing single-event limits."""
+
+    event_records: int = MAX_GRAPH_EVENT_RECORDS
+    aggregate_event_bytes: int = MAX_AGGREGATE_GRAPH_EVENT_BYTES
+    parent_fanout: int = MAX_GRAPH_PARENT_REFERENCES
+    graph_depth: int = MAX_GRAPH_DEPTH
+
+    def __post_init__(self):
+        VerificationLimits.__post_init__(self)
+        _validate_limit(
+            'event_records', self.event_records, 1, MAX_GRAPH_EVENT_RECORDS,
+        )
+        _validate_limit(
+            'aggregate_event_bytes', self.aggregate_event_bytes,
+            1, MAX_AGGREGATE_GRAPH_EVENT_BYTES,
+        )
+        _validate_limit(
+            'parent_fanout', self.parent_fanout, 0, MAX_GRAPH_PARENT_REFERENCES,
+        )
+        _validate_limit('graph_depth', self.graph_depth, 1, MAX_GRAPH_DEPTH)
+
+
+@dataclass(frozen=True, slots=True)
 class VerificationResult:
     status: VerificationStatus
     event_id: str
@@ -238,6 +280,16 @@ class VerificationResult:
     time_assurance: TimeAssuranceStatus
     history_completeness: HistoryCompletenessStatus
     declared_parent_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class GraphVerificationResult:
+    status: GraphVerificationStatus
+    events: Tuple[VerificationResult, ...]
+    duplicate_signed_records: int
+    maximum_depth: int
+    declared_parent_closure: ParentClosureStatus
+    history_completeness: HistoryCompletenessStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -911,6 +963,18 @@ def _limits_or_default(limits):
     return limits
 
 
+def _graph_limits_or_default(limits):
+    if limits is None:
+        return GraphVerificationLimits()
+    if not isinstance(limits, GraphVerificationLimits):
+        raise ProvenanceVerificationError(
+            ErrorCategory.CONFIGURATION,
+            VerificationStage.INPUT,
+            'limits must be a GraphVerificationLimits instance or None',
+        )
+    return limits
+
+
 def _snapshot(file_stat):
     return _FileSnapshot(
         device=file_stat.st_dev,
@@ -1205,12 +1269,170 @@ def verify_signed_event_files(
     )
 
 
+def verify_signed_event_graph(
+        records: Sequence[bytes],
+        public_key_records: Sequence[bytes],
+        *,
+        package_path: Optional[PathLike] = None,
+        limits: Optional[GraphVerificationLimits] = None,
+) -> GraphVerificationResult:
+    """Preflight a detached signed-event graph; graph validation is pending."""
+    effective = _graph_limits_or_default(limits)
+    _validate_key_sequence(records, 'signed-event records')
+    if not records:
+        raise ProvenanceVerificationError(
+            ErrorCategory.INPUT,
+            VerificationStage.INPUT,
+            'signed-event records must not be empty',
+        )
+    if len(records) > effective.event_records:
+        raise ProvenanceVerificationError(
+            ErrorCategory.RESOURCE_LIMIT,
+            VerificationStage.INPUT,
+            'too many signed-event records',
+        )
+
+    aggregate = 0
+    for record in records:
+        if type(record) is not bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.INPUT,
+                VerificationStage.INPUT,
+                'signed-event record must be bytes',
+            )
+        if not 1 <= len(record) <= effective.event_bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.RESOURCE_LIMIT,
+                VerificationStage.INPUT,
+                'signed-event record size is outside the configured limit',
+            )
+        aggregate += len(record)
+        if aggregate > effective.aggregate_event_bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.RESOURCE_LIMIT,
+                VerificationStage.INPUT,
+                'aggregate signed-event data exceeds the configured limit',
+            )
+
+    _validate_key_sequence(public_key_records, 'public-key records')
+    if len(public_key_records) > effective.key_records:
+        raise ProvenanceVerificationError(
+            ErrorCategory.RESOURCE_LIMIT,
+            VerificationStage.INPUT,
+            'too many public-key records',
+        )
+    aggregate = 0
+    for raw in public_key_records:
+        if type(raw) is not bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.INPUT,
+                VerificationStage.INPUT,
+                'public-key record must be bytes',
+            )
+        if not 1 <= len(raw) <= effective.key_record_bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.RESOURCE_LIMIT,
+                VerificationStage.INPUT,
+                'public-key record size is outside the configured limit',
+            )
+        aggregate += len(raw)
+        if aggregate > effective.aggregate_key_bytes:
+            raise ProvenanceVerificationError(
+                ErrorCategory.RESOURCE_LIMIT,
+                VerificationStage.INPUT,
+                'aggregate public-key data exceeds the configured limit',
+            )
+
+    raise ProvenanceVerificationError(
+        ErrorCategory.NOT_IMPLEMENTED,
+        VerificationStage.GRAPH,
+        'signed-event graph validation is not implemented',
+    )
+
+
+def verify_signed_event_graph_files(
+        event_paths: Sequence[PathLike],
+        key_paths: Sequence[PathLike],
+        *,
+        package_path: Optional[PathLike] = None,
+        limits: Optional[GraphVerificationLimits] = None,
+) -> GraphVerificationResult:
+    """Read bounded detached graph inputs, then invoke graph preflight."""
+    effective = _graph_limits_or_default(limits)
+    _validate_key_sequence(event_paths, 'signed-event paths')
+    if not event_paths:
+        raise ProvenanceVerificationError(
+            ErrorCategory.INPUT,
+            VerificationStage.INPUT,
+            'signed-event paths must not be empty',
+        )
+    if len(event_paths) > effective.event_records:
+        raise ProvenanceVerificationError(
+            ErrorCategory.RESOURCE_LIMIT,
+            VerificationStage.INPUT,
+            'too many signed-event paths',
+        )
+    _validate_key_sequence(key_paths, 'public-key paths')
+    if len(key_paths) > effective.key_records:
+        raise ProvenanceVerificationError(
+            ErrorCategory.RESOURCE_LIMIT,
+            VerificationStage.INPUT,
+            'too many public-key records',
+        )
+
+    with ExitStack() as stack:
+        events = []
+        aggregate = 0
+        for index, path in enumerate(event_paths):
+            event = _open_preflighted_file(
+                stack, path, effective.event_bytes,
+                f'signed-event record {index}',
+            )
+            aggregate += event.snapshot.size
+            if aggregate > effective.aggregate_event_bytes:
+                raise ProvenanceVerificationError(
+                    ErrorCategory.RESOURCE_LIMIT,
+                    VerificationStage.INPUT,
+                    'aggregate signed-event data exceeds the configured limit',
+                )
+            events.append(event)
+
+        keys = []
+        aggregate = 0
+        for path in key_paths:
+            key = _open_preflighted_file(
+                stack, path, effective.key_record_bytes, 'public-key record',
+            )
+            aggregate += key.snapshot.size
+            if aggregate > effective.aggregate_key_bytes:
+                raise ProvenanceVerificationError(
+                    ErrorCategory.RESOURCE_LIMIT,
+                    VerificationStage.INPUT,
+                    'aggregate public-key data exceeds the configured limit',
+                )
+            keys.append(key)
+
+        record_raws = [_read_preflighted_file(event) for event in events]
+        key_record_raws = [_read_preflighted_file(key) for key in keys]
+
+    return verify_signed_event_graph(
+        record_raws,
+        key_record_raws,
+        package_path=package_path,
+        limits=effective,
+    )
+
+
 __all__ = [
     'AssetIntegrityStatus',
     'ErrorCategory',
+    'GraphVerificationLimits',
+    'GraphVerificationResult',
+    'GraphVerificationStatus',
     'HistoryCompletenessStatus',
     'InvestigatorIdentityStatus',
     'KeyTrustStatus',
+    'ParentClosureStatus',
     'ProvenanceVerificationError',
     'TimeAssuranceStatus',
     'VerificationLimits',
@@ -1219,4 +1441,6 @@ __all__ = [
     'VerificationStatus',
     'verify_signed_event',
     'verify_signed_event_files',
+    'verify_signed_event_graph',
+    'verify_signed_event_graph_files',
 ]
