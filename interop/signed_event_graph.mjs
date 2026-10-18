@@ -1,5 +1,5 @@
 // Bounded, deterministic signed-event graph ingestion for the AURAL profile.
-// Parent resolution and all graph-level cryptographic claims are intentionally deferred.
+// Internal parent resolution is structural-only; graph cryptography remains deferred.
 import {
   signedEventSha256,
   validateSignedEventRecord,
@@ -8,11 +8,15 @@ import {
 export const MAX_GRAPH_EVENT_RECORDS = 4096;
 export const MAX_AGGREGATE_GRAPH_EVENT_BYTES = 64 * 1024 * 1024;
 export const MAX_SIGNED_EVENT_BYTES = 1024 * 1024;
+export const MAX_GRAPH_PARENT_REFERENCES = 64;
+export const MAX_GRAPH_DEPTH = 256;
 
 const LIMIT_NAMES = new Set([
   'maxEventRecords',
   'maxAggregateEventBytes',
   'maxRecord',
+  'maxParentReferences',
+  'maxGraphDepth',
 ]);
 
 export class SignedEventGraphError extends Error {
@@ -28,14 +32,14 @@ function fail(category, stage, message, options = undefined) {
   throw new SignedEventGraphError(category, stage, message, options);
 }
 
-function configuredLimit(options, name, maximum) {
+function configuredLimit(options, name, maximum, minimum = 1) {
   if (!(name in options)) return maximum;
   const value = options[name];
-  if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
     fail(
       'configuration',
       'input',
-      `${name} must be an integer from 1 through ${maximum}`,
+      `${name} must be an integer from ${minimum} through ${maximum}`,
     );
   }
   return value;
@@ -56,6 +60,10 @@ function graphLimits(options) {
       options, 'maxAggregateEventBytes', MAX_AGGREGATE_GRAPH_EVENT_BYTES,
     ),
     maxRecord: configuredLimit(options, 'maxRecord', MAX_SIGNED_EVENT_BYTES),
+    maxParentReferences: configuredLimit(
+      options, 'maxParentReferences', MAX_GRAPH_PARENT_REFERENCES, 0,
+    ),
+    maxGraphDepth: configuredLimit(options, 'maxGraphDepth', MAX_GRAPH_DEPTH),
   });
 }
 
@@ -173,6 +181,21 @@ export class SignedEventGraphIndex {
   }
 }
 
+class StructurallyResolvedSignedEventGraph {
+  constructor(records, maximumDepth) {
+    this.status = 'structural_only';
+    this.verificationStatus = 'not_performed';
+    this.parentResolution = 'resolved';
+    this.signatureVerification = 'not_performed';
+    this.historyCompleteness = 'not_established';
+    this.recordCount = records.length;
+    this.maximumDepth = maximumDepth;
+    this.eventIds = Object.freeze(records.map(record => record.eventId));
+    this.records = Object.freeze([...records]);
+    Object.freeze(this);
+  }
+}
+
 function comparePrepared(left, right) {
   const digestOrder = compareText(left.digest, right.digest);
   return digestOrder || Buffer.compare(left.recordBytes, right.recordBytes);
@@ -182,6 +205,132 @@ function compareText(left, right) {
   if (left < right) return -1;
   if (left > right) return 1;
   return 0;
+}
+
+class TextMinHeap {
+  #values = [];
+
+  get size() {
+    return this.#values.length;
+  }
+
+  push(value) {
+    let index = this.#values.length;
+    this.#values.push(value);
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (compareText(this.#values[parent], value) <= 0) break;
+      this.#values[index] = this.#values[parent];
+      index = parent;
+    }
+    this.#values[index] = value;
+  }
+
+  pop() {
+    const minimum = this.#values[0];
+    const last = this.#values.pop();
+    if (this.#values.length === 0) return minimum;
+
+    let index = 0;
+    while (true) {
+      const left = index * 2 + 1;
+      if (left >= this.#values.length) break;
+      const right = left + 1;
+      let child = left;
+      if (right < this.#values.length
+          && compareText(this.#values[right], this.#values[left]) < 0) {
+        child = right;
+      }
+      if (compareText(this.#values[child], last) >= 0) break;
+      this.#values[index] = this.#values[child];
+      index = child;
+    }
+    this.#values[index] = last;
+    return minimum;
+  }
+}
+
+function resolveSignedEventGraphStructure(index, options = {}) {
+  const limits = graphLimits(options);
+  if (!(index instanceof SignedEventGraphIndex)) {
+    fail('configuration', 'input', 'index must be a SignedEventGraphIndex');
+  }
+
+  // Re-sort defensively instead of depending on Map or constructor insertion order.
+  const eventIds = [...index.eventIds].sort(compareText);
+
+  // Enforce fanout for every node before allocating adjacency structures.
+  for (const eventId of eventIds) {
+    const parents = index.getByEventId(eventId).assertion.parents;
+    if (parents.length > limits.maxParentReferences) {
+      fail(
+        'resource_limit',
+        'graph',
+        'event parent fanout exceeds the configured limit',
+      );
+    }
+  }
+
+  const children = new Map(eventIds.map(eventId => [eventId, []]));
+  const parentCounts = new Map();
+
+  // Nodes are visited by event ID, giving deterministic precedence to faults.
+  // Adjacency is populated only after each reference is resolved exactly.
+  for (const eventId of eventIds) {
+    const parents = index.getByEventId(eventId).assertion.parents;
+    parentCounts.set(eventId, parents.length);
+    for (const reference of parents) {
+      const parentId = reference.event_id;
+      const parent = index.getByEventId(parentId);
+      if (parent === undefined) {
+        fail('missing_parent', 'graph', 'declared parent event_id is absent');
+      }
+      if (parent.signedEventSha256 !== reference.signed_event_digest.value) {
+        fail(
+          'parent_digest_mismatch',
+          'graph',
+          'declared parent digest does not match the indexed event',
+        );
+      }
+      children.get(parentId).push(eventId);
+    }
+  }
+
+  const eligible = new TextMinHeap();
+  const depths = new Map();
+  for (const eventId of eventIds) {
+    if (parentCounts.get(eventId) === 0) {
+      eligible.push(eventId);
+      depths.set(eventId, 1);
+    }
+  }
+
+  const ordered = [];
+  let maximumDepth = 0;
+  let depthExceeded = false;
+  while (eligible.size > 0) {
+    const eventId = eligible.pop();
+    ordered.push(index.getByEventId(eventId));
+    const depth = depths.get(eventId);
+    maximumDepth = Math.max(maximumDepth, depth);
+    if (depth > limits.maxGraphDepth) depthExceeded = true;
+
+    for (const childId of children.get(eventId)) {
+      depths.set(childId, Math.max(depths.get(childId) ?? 1, depth + 1));
+      const remaining = parentCounts.get(childId) - 1;
+      parentCounts.set(childId, remaining);
+      if (remaining === 0) eligible.push(childId);
+    }
+  }
+
+  if (ordered.length !== eventIds.length) {
+    fail('cycle', 'graph', 'signed-event parent graph contains a directed cycle');
+  }
+  if (depthExceeded) {
+    fail('resource_limit', 'graph', 'graph depth exceeds the configured limit');
+  }
+
+  return new StructurallyResolvedSignedEventGraph(ordered, maximumDepth);
 }
 
 function indexWithDigest(records, options, digestFunction) {
@@ -260,5 +409,9 @@ export const __testing = Object.freeze({
       fail('configuration', 'input', 'digestFunction must be a function');
     }
     return indexWithDigest(records, options, digestFunction);
+  },
+  // Structural-only seam for Phase 008B tests and later Phase 008C integration.
+  resolveSignedEventGraphStructure(index, options = {}) {
+    return resolveSignedEventGraphStructure(index, options);
   },
 });
