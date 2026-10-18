@@ -1,6 +1,6 @@
-// Bounded, deterministic signed-event graph ingestion for the AURAL profile.
-// Internal parent resolution is structural-only; graph cryptography remains deferred.
+// Bounded, deterministic signed-event graph verification for the AURAL profile.
 import {
+  createSignedEventVerifier,
   signedEventSha256,
   validateSignedEventRecord,
 } from './validate_provenance.mjs';
@@ -11,12 +11,26 @@ export const MAX_SIGNED_EVENT_BYTES = 1024 * 1024;
 export const MAX_GRAPH_PARENT_REFERENCES = 64;
 export const MAX_GRAPH_DEPTH = 256;
 
-const LIMIT_NAMES = new Set([
+const MAX_GRAPH_KEY_RECORDS = 64;
+const MAX_GRAPH_KEY_RECORD_BYTES = 16 * 1024;
+const MAX_AGGREGATE_GRAPH_KEY_BYTES = 256 * 1024;
+
+const INDEX_LIMIT_NAMES = new Set([
   'maxEventRecords',
   'maxAggregateEventBytes',
   'maxRecord',
+]);
+
+const RESOLUTION_LIMIT_NAMES = new Set([
   'maxParentReferences',
   'maxGraphDepth',
+]);
+
+const VERIFICATION_LIMIT_NAMES = new Set([
+  ...INDEX_LIMIT_NAMES,
+  ...RESOLUTION_LIMIT_NAMES,
+  'maxKeyRecords',
+  'maxKeyData',
 ]);
 
 export class SignedEventGraphError extends Error {
@@ -45,25 +59,53 @@ function configuredLimit(options, name, maximum, minimum = 1) {
   return value;
 }
 
-function graphLimits(options) {
+function checkOptions(options, names, label) {
   if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-    fail('configuration', 'input', 'graph indexing options must be an object');
+    fail('configuration', 'input', `${label} options must be an object`);
   }
   for (const name of Object.keys(options)) {
-    if (!LIMIT_NAMES.has(name)) {
-      fail('configuration', 'input', `unknown graph indexing option: ${name}`);
+    if (!names.has(name)) {
+      fail('configuration', 'input', `unknown ${label} option: ${name}`);
     }
   }
+}
+
+function indexingLimits(options) {
+  checkOptions(options, INDEX_LIMIT_NAMES, 'graph indexing');
   return Object.freeze({
     maxEventRecords: configuredLimit(options, 'maxEventRecords', MAX_GRAPH_EVENT_RECORDS),
     maxAggregateEventBytes: configuredLimit(
       options, 'maxAggregateEventBytes', MAX_AGGREGATE_GRAPH_EVENT_BYTES,
     ),
     maxRecord: configuredLimit(options, 'maxRecord', MAX_SIGNED_EVENT_BYTES),
+  });
+}
+
+function resolutionLimits(options) {
+  checkOptions(options, RESOLUTION_LIMIT_NAMES, 'graph resolution');
+  return Object.freeze({
     maxParentReferences: configuredLimit(
       options, 'maxParentReferences', MAX_GRAPH_PARENT_REFERENCES, 0,
     ),
     maxGraphDepth: configuredLimit(options, 'maxGraphDepth', MAX_GRAPH_DEPTH),
+  });
+}
+
+function verificationLimits(options) {
+  checkOptions(options, VERIFICATION_LIMIT_NAMES, 'graph verification');
+  return Object.freeze({
+    indexing: indexingLimits(Object.fromEntries(
+      Object.entries(options).filter(([name]) => INDEX_LIMIT_NAMES.has(name)),
+    )),
+    resolution: resolutionLimits(Object.fromEntries(
+      Object.entries(options).filter(([name]) => RESOLUTION_LIMIT_NAMES.has(name)),
+    )),
+    keys: Object.freeze({
+      maxKeyRecords: configuredLimit(options, 'maxKeyRecords', MAX_GRAPH_KEY_RECORDS, 0),
+      maxKeyData: configuredLimit(
+        options, 'maxKeyData', MAX_AGGREGATE_GRAPH_KEY_BYTES, 0,
+      ),
+    }),
   });
 }
 
@@ -94,6 +136,32 @@ function copyBoundedInputs(records, limits) {
         'input',
         'aggregate signed-event data exceeds the configured limit',
       );
+    }
+    copies.push(Buffer.from(record));
+  }
+  return copies;
+}
+
+function copyBoundedKeyInputs(records, limits) {
+  if (!Array.isArray(records)) {
+    fail('input', 'input', 'public-key records must be an array');
+  }
+  if (records.length > limits.maxKeyRecords) {
+    fail('resource_limit', 'input', 'too many public-key records');
+  }
+
+  let aggregateBytes = 0;
+  const copies = [];
+  for (const record of records) {
+    if (!Buffer.isBuffer(record)) {
+      fail('input', 'input', 'public-key record must be supplied as bytes');
+    }
+    if (record.length < 1 || record.length > MAX_GRAPH_KEY_RECORD_BYTES) {
+      fail('resource_limit', 'input', 'public-key record size is outside the configured limit');
+    }
+    aggregateBytes += record.length;
+    if (aggregateBytes > limits.maxKeyData) {
+      fail('resource_limit', 'input', 'aggregate public-key data exceeds the configured limit');
     }
     copies.push(Buffer.from(record));
   }
@@ -251,7 +319,7 @@ class TextMinHeap {
 }
 
 function resolveSignedEventGraphStructure(index, options = {}) {
-  const limits = graphLimits(options);
+  const limits = resolutionLimits(options);
   if (!(index instanceof SignedEventGraphIndex)) {
     fail('configuration', 'input', 'index must be a SignedEventGraphIndex');
   }
@@ -334,7 +402,7 @@ function resolveSignedEventGraphStructure(index, options = {}) {
 }
 
 function indexWithDigest(records, options, digestFunction) {
-  const limits = graphLimits(options);
+  const limits = indexingLimits(options);
   const boundedRecords = copyBoundedInputs(records, limits);
   const prepared = boundedRecords.map(recordBytes => ({
     recordBytes,
@@ -400,6 +468,64 @@ function indexWithDigest(records, options, digestFunction) {
 
 export function indexSignedEventRecords(records, options = {}) {
   return indexWithDigest(records, options, signedEventSha256);
+}
+
+function graphVerificationFailure(error, stage) {
+  if (error?.category) {
+    throw new SignedEventGraphError(error.category, stage, error.message, { cause: error });
+  }
+  throw error;
+}
+
+export function verifySignedEventGraph(records, keyRecordRaws, options = {}) {
+  const limits = verificationLimits(options);
+  const boundedKeyRecords = copyBoundedKeyInputs(keyRecordRaws, limits.keys);
+
+  // This public boundary intentionally accepts raw record bytes only. It never
+  // accepts a caller-provided index, including one built through test seams.
+  const index = indexWithDigest(records, limits.indexing, signedEventSha256);
+  const resolved = resolveSignedEventGraphStructure(index, limits.resolution);
+
+  let verifier;
+  try {
+    verifier = createSignedEventVerifier(boundedKeyRecords, {
+      ...limits.keys,
+      maxRecord: limits.indexing.maxRecord,
+    });
+  } catch (error) {
+    graphVerificationFailure(error, 'key');
+  }
+
+  const events = resolved.records.map(entry => {
+    let verified;
+    try {
+      verified = verifier.verify(entry.recordBytes);
+    } catch (error) {
+      graphVerificationFailure(error, error?.category === 'missing_key' ? 'key' : 'signature');
+    }
+    const { assertion: _assertion, ...publicResult } = verified;
+    return deepFreeze({
+      ...publicResult,
+      signed_event_sha256: entry.signedEventSha256,
+    });
+  });
+
+  // Parts 008C-2 and 008C-3 have not bound these events to independently
+  // verified packages or established historical completeness. Keep the public
+  // outcome explicitly incomplete even though all supplied signatures are valid.
+  return deepFreeze({
+    status: 'verification_incomplete',
+    verificationStatus: 'not_implemented',
+    parentResolution: 'resolved',
+    signatureVerification: 'valid',
+    packageIntegrity: 'not_checked',
+    historyCompleteness: 'not_established',
+    recordCount: index.recordCount,
+    duplicateRecordCount: index.duplicateRecordCount,
+    maximumDepth: resolved.maximumDepth,
+    eventIds: [...resolved.eventIds],
+    events,
+  });
 }
 
 // A narrow test seam for the otherwise infeasible SHA-256 collision branch.

@@ -262,6 +262,26 @@ function validateKeyRecord(raw) {
   return { ...key, publicKey };
 }
 
+function validatePublicKeyRecords(keyRecordRaws, options = {}) {
+  if (!Array.isArray(keyRecordRaws)) fail('input', 'public-key records must be an array');
+  const maxKeyRecords = boundedOption(options.maxKeyRecords, MAX_KEY_RECORDS);
+  const maxKeyData = boundedOption(options.maxKeyData, MAX_KEY_DATA);
+  if (keyRecordRaws.length > maxKeyRecords) fail('resource_limit', 'too many public-key records');
+  const keys = new Map();
+  let aggregateKeyData = 0;
+  for (const raw of keyRecordRaws) {
+    if (!Buffer.isBuffer(raw)) fail('input', 'public-key record must be supplied as bytes');
+    aggregateKeyData += raw.length;
+    if (aggregateKeyData > maxKeyData) {
+      fail('resource_limit', 'aggregate public-key data exceeds limit');
+    }
+    const key = validateKeyRecord(raw);
+    if (keys.has(key.key_id)) fail('duplicate_key', 'duplicate public-key record for key_id');
+    keys.set(key.key_id, key);
+  }
+  return keys;
+}
+
 function validateParentReferences(assertion) {
   if (!Array.isArray(assertion.parents) || assertion.parents.length > MAX_PARENTS) {
     fail('schema', 'parents must be an array of at most 4096 references');
@@ -412,6 +432,41 @@ export function signedEventSha256(recordRaw) {
   return createHash('sha256').update(RECORD_DOMAIN).update(recordRaw).digest('hex');
 }
 
+function verifyValidatedSignedEvent(record, keys) {
+  const key = keys.get(record.assertion.signing_key_id);
+  if (!key) fail('missing_key', 'no public-key record matches signing_key_id');
+  const signature = canonicalBase64url(record.signature, 64, 'signature');
+  const assertionBytes = Buffer.from(canonical(record.assertion), 'utf8');
+  const signatureInput = Buffer.concat([DOMAIN, assertionBytes]);
+  verifyEd25519ProfileOrFail(key.publicKey, signatureInput, signature);
+  return {
+    status: 'signature_valid',
+    event_id: record.assertion.event_id,
+    evidence_id: record.assertion.evidence_id,
+    signing_key_id: record.assertion.signing_key_id,
+    asset_integrity: 'not_checked',
+    investigator_identity: 'not_established',
+    key_trust: 'not_evaluated',
+    time_assurance: record.assertion.claims.claimed_times ? 'claimed_only' : 'unknown',
+    history_completeness: 'not_established',
+    assertion: record.assertion,
+  };
+}
+
+// Reuses one validated key collection across graph events. Each supplied event
+// is still independently parsed and schema-validated before cryptographic use.
+export function createSignedEventVerifier(keyRecordRaws, options = {}) {
+  const keys = validatePublicKeyRecords(keyRecordRaws, options);
+  const maximum = Number.isSafeInteger(options.maxRecord) && options.maxRecord >= 0
+    ? Math.min(options.maxRecord, MAX_RECORD) : MAX_RECORD;
+  return Object.freeze({
+    verify(recordRaw) {
+      const record = validateSignedEventRecord(recordRaw, { maxRecord: maximum });
+      return verifyValidatedSignedEvent(record, keys);
+    },
+  });
+}
+
 export function verifySignedEvent(recordRaw, keyRecordRaws, options = {}) {
   const maximum = Number.isSafeInteger(options.maxRecord) && options.maxRecord >= 0
     ? Math.min(options.maxRecord, MAX_RECORD) : MAX_RECORD;
@@ -420,41 +475,21 @@ export function verifySignedEvent(recordRaw, keyRecordRaws, options = {}) {
     fail('schema', 'signed-event envelope must contain exactly assertion and signature');
   }
   validateAssertion(record.assertion);
-  if (!Array.isArray(keyRecordRaws)) fail('input', 'public-key records must be an array');
-  const maxKeyRecords = boundedOption(options.maxKeyRecords, MAX_KEY_RECORDS);
-  const maxKeyData = boundedOption(options.maxKeyData, MAX_KEY_DATA);
-  if (keyRecordRaws.length > maxKeyRecords) fail('resource_limit', 'too many public-key records');
-  const keys = new Map();
-  let aggregateKeyData = 0;
-  for (const raw of keyRecordRaws) {
-    if (!Buffer.isBuffer(raw)) fail('input', 'public-key record must be supplied as bytes');
-    aggregateKeyData += raw.length;
-    if (aggregateKeyData > maxKeyData) {
-      fail('resource_limit', 'aggregate public-key data exceeds limit');
-    }
-    const key = validateKeyRecord(raw);
-    if (keys.has(key.key_id)) fail('duplicate_key', 'duplicate public-key record for key_id');
-    keys.set(key.key_id, key);
-  }
-  const key = keys.get(record.assertion.signing_key_id);
-  if (!key) fail('missing_key', 'no public-key record matches signing_key_id');
-  const signature = canonicalBase64url(record.signature, 64, 'signature');
-  const assertionBytes = Buffer.from(canonical(record.assertion), 'utf8');
-  const signatureInput = Buffer.concat([DOMAIN, assertionBytes]);
-  verifyEd25519ProfileOrFail(key.publicKey, signatureInput, signature);
+  const keys = validatePublicKeyRecords(keyRecordRaws, options);
+  const result = verifyValidatedSignedEvent(record, keys);
   const signedEventDigest = signedEventSha256(recordRaw);
   return {
-    status: 'signature_valid',
-    event_id: record.assertion.event_id,
-    evidence_id: record.assertion.evidence_id,
-    signing_key_id: record.assertion.signing_key_id,
+    status: result.status,
+    event_id: result.event_id,
+    evidence_id: result.evidence_id,
+    signing_key_id: result.signing_key_id,
     signed_event_sha256: signedEventDigest,
-    asset_integrity: 'not_checked',
-    investigator_identity: 'not_established',
-    key_trust: 'not_evaluated',
-    time_assurance: record.assertion.claims.claimed_times ? 'claimed_only' : 'unknown',
-    history_completeness: 'not_established',
-    assertion: record.assertion,
+    asset_integrity: result.asset_integrity,
+    investigator_identity: result.investigator_identity,
+    key_trust: result.key_trust,
+    time_assurance: result.time_assurance,
+    history_completeness: result.history_completeness,
+    assertion: result.assertion,
   };
 }
 

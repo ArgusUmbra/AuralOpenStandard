@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import {
+  createHash,
+  generateKeyPairSync,
+  sign as signMessage,
+} from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,11 +18,17 @@ import {
   MAX_GRAPH_EVENT_RECORDS,
   MAX_GRAPH_PARENT_REFERENCES,
   SignedEventGraphIndex,
+  verifySignedEventGraph,
 } from '../interop/signed_event_graph.mjs';
-import { signedEventSha256 } from '../interop/validate_provenance.mjs';
+import {
+  signedEventSha256,
+  verifySignedEvent,
+} from '../interop/validate_provenance.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(ROOT, 'fixtures', 'provenance');
+const KEY_ID_DOMAIN = Buffer.from('AURAL-KEY-ID-V1\0Ed25519\0', 'ascii');
+const SIGNATURE_DOMAIN = Buffer.from('AURAL-PROVENANCE-EVENT-V1\0', 'ascii');
 
 async function fixture(name) {
   return readFile(join(FIXTURES, name));
@@ -93,8 +104,56 @@ class GraphBuilder {
   }
 }
 
+class GenuineSignedGraphBuilder extends GraphBuilder {
+  signer() {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+    const publicKeyBytes = Buffer.from(publicKey.export({ format: 'jwk' }).x, 'base64url');
+    const fingerprint = createHash('sha256')
+      .update(KEY_ID_DOMAIN)
+      .update(publicKeyBytes)
+      .digest('hex');
+    const keyId = `urn:aural:key:ed25519:${fingerprint}`;
+    const keyRecord = this.encode({
+      algorithm: 'Ed25519',
+      key_id: keyId,
+      key_schema: 'org.aural.signing-key',
+      key_schema_version: '1',
+      public_key: publicKeyBytes.toString('base64url'),
+    });
+    return { keyId, keyRecord, privateKey };
+  }
+
+  addSigned(number, signer, parentNumbers = []) {
+    const parents = parentNumbers.map(parentNumber => {
+      const record = this.records.get(parentNumber);
+      assert.ok(record, `parent ${parentNumber} must be built first`);
+      return [this.eventId(parentNumber), signedEventSha256(record)];
+    });
+    const document = this.document(number, parents);
+    document.assertion.signing_key_id = signer.keyId;
+    document.assertion.claims.acquiring_key_id = signer.keyId;
+    const assertionBytes = Buffer.from(canonicalJson(document.assertion), 'utf8');
+    document.signature = signMessage(
+      null,
+      Buffer.concat([SIGNATURE_DOMAIN, assertionBytes]),
+      signer.privateKey,
+    ).toString('base64url');
+    const record = this.encode(document);
+    this.records.set(number, record);
+    return record;
+  }
+}
+
+function tamperSignature(record) {
+  const document = JSON.parse(record);
+  const signature = Buffer.from(document.signature, 'base64url');
+  signature[0] ^= 1;
+  document.signature = signature.toString('base64url');
+  return Buffer.from(canonicalJson(document), 'utf8');
+}
+
 function resolveRecords(records, options = {}) {
-  const index = indexSignedEventRecords(records, options);
+  const index = indexSignedEventRecords(records);
   return [index, __testing.resolveSignedEventGraphStructure(index, options)];
 }
 
@@ -272,6 +331,236 @@ test('domain-separated digests agree with Python conformance vectors', async () 
     const index = indexSignedEventRecords([await fixture(name)]);
     assert.deepEqual(index.signedEventDigests, [expected], name);
   }
+});
+
+test('cryptographically verifies one genuine signed event but reports an incomplete graph', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  const result = verifySignedEventGraph([record], [key]);
+
+  assert.equal(result.status, 'verification_incomplete');
+  assert.equal(result.verificationStatus, 'not_implemented');
+  assert.equal(result.parentResolution, 'resolved');
+  assert.equal(result.signatureVerification, 'valid');
+  assert.equal(result.packageIntegrity, 'not_checked');
+  assert.equal(result.historyCompleteness, 'not_established');
+  assert.equal(result.recordCount, 1);
+  assert.equal(result.maximumDepth, 1);
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].status, 'signature_valid');
+  assert.equal(
+    result.events[0].signed_event_sha256,
+    'e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e',
+  );
+});
+
+test('cryptographically verifies a genuine parent-first multi-event graph', async () => {
+  const [root, child, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-received-with-parent.json'),
+    fixture('valid-key.json'),
+  ]);
+  const result = verifySignedEventGraph([child, root], [key]);
+
+  assert.deepEqual(result.eventIds, [
+    'urn:uuid:11111111-2222-4333-8444-555555555555',
+    'urn:uuid:11111111-2222-4333-a444-555555555555',
+  ]);
+  assert.deepEqual(result.events.map(event => event.event_id), result.eventIds);
+  assert.equal(result.maximumDepth, 2);
+  assert.equal(result.events.every(event => event.status === 'signature_valid'), true);
+});
+
+test('rejects an invalid or tampered graph signature', async () => {
+  const [record, key] = await Promise.all([
+    fixture('invalid-signature.json'),
+    fixture('valid-key.json'),
+  ]);
+  assert.throws(
+    () => verifySignedEventGraph([record], [key]),
+    expectError('signature', 'signature'),
+  );
+});
+
+test('rejects a graph event whose signing key is missing', async () => {
+  const record = await fixture('valid-original-acquired.json');
+  assert.throws(
+    () => verifySignedEventGraph([record], []),
+    expectError('missing_key', 'key'),
+  );
+});
+
+test('rejects a wrong supplied public key', async () => {
+  const record = await fixture('valid-original-acquired.json');
+  const builder = new GenuineSignedGraphBuilder();
+  const wrongSigner = builder.signer();
+  const wrongKey = JSON.parse(wrongSigner.keyRecord);
+  wrongKey.key_id = JSON.parse(record).assertion.signing_key_id;
+  assert.throws(
+    () => verifySignedEventGraph([record], [builder.encode(wrongKey)]),
+    expectError('key_id_mismatch', 'key'),
+  );
+});
+
+test('rejects a malformed public-key record', async () => {
+  const [record, malformedKey] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('key-invalid-encoding.json'),
+  ]);
+  assert.throws(
+    () => verifySignedEventGraph([record], [malformedKey]),
+    expectError('encoding', 'key'),
+  );
+});
+
+test('rejects duplicate public-key identifiers, including identical key records', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  assert.throws(
+    () => verifySignedEventGraph([record], [key, key]),
+    expectError('duplicate_key', 'key'),
+  );
+});
+
+test('accepts multiple distinct valid signing keys and selects each key by identifier', () => {
+  const builder = new GenuineSignedGraphBuilder();
+  const firstSigner = builder.signer();
+  const secondSigner = builder.signer();
+  const first = builder.addSigned(1, firstSigner);
+  const second = builder.addSigned(2, secondSigner);
+
+  const result = verifySignedEventGraph(
+    [second, first],
+    [secondSigner.keyRecord, firstSigner.keyRecord],
+  );
+  assert.equal(result.recordCount, 2);
+  assert.deepEqual(
+    result.events.map(event => event.signing_key_id),
+    [firstSigner.keyId, secondSigner.keyId],
+  );
+});
+
+test('verifies identical duplicate signed events once logically', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  const result = verifySignedEventGraph([record, record, record], [key]);
+
+  assert.equal(result.recordCount, 1);
+  assert.equal(result.duplicateRecordCount, 2);
+  assert.equal(result.events.length, 1);
+});
+
+test('rejects a mixed graph containing valid and invalid unique signatures', () => {
+  const builder = new GenuineSignedGraphBuilder();
+  const signer = builder.signer();
+  const valid = builder.addSigned(1, signer);
+  const invalid = tamperSignature(builder.addSigned(2, signer));
+
+  assert.throws(
+    () => verifySignedEventGraph([invalid, valid], [signer.keyRecord]),
+    expectError('signature', 'signature'),
+  );
+});
+
+test('rejects structural faults before processing malformed key input', async () => {
+  const builder = new GraphBuilder();
+  const child = builder.encode(builder.document(1, [[builder.eventId(2), '0'.repeat(64)]]));
+  const malformedKey = await fixture('key-invalid-encoding.json');
+
+  assert.throws(
+    () => verifySignedEventGraph([child], [malformedKey]),
+    expectError('missing_parent', 'graph'),
+  );
+});
+
+test('public graph verification rejects synthetic-index substitution', async () => {
+  const key = await fixture('valid-key.json');
+  const index = syntheticIndex({ 1: [] });
+
+  assert.throws(
+    () => verifySignedEventGraph(index, [key]),
+    expectError('input', 'input'),
+  );
+});
+
+test('graph verification enforces resolution limits only after validated indexing', () => {
+  const builder = new GenuineSignedGraphBuilder();
+  const signer = builder.signer();
+  const root = builder.addSigned(1, signer);
+  const child = builder.addSigned(2, signer, [1]);
+
+  assert.throws(
+    () => indexSignedEventRecords([root, child], { maxGraphDepth: 1 }),
+    expectError('configuration', 'input'),
+  );
+  assert.throws(
+    () => verifySignedEventGraph([root, child], [signer.keyRecord], { maxGraphDepth: 1 }),
+    expectError('resource_limit', 'graph'),
+  );
+  assert.throws(
+    () => verifySignedEventGraph(
+      [root, child], [signer.keyRecord], { maxParentReferences: 0 },
+    ),
+    expectError('resource_limit', 'graph'),
+  );
+});
+
+test('graph verification preserves key count and aggregate-byte input limits', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+
+  assert.throws(
+    () => verifySignedEventGraph([record], [key], { maxKeyRecords: 0 }),
+    expectError('resource_limit', 'input'),
+  );
+  assert.throws(
+    () => verifySignedEventGraph([record], [key], { maxKeyData: key.length - 1 }),
+    expectError('resource_limit', 'input'),
+  );
+});
+
+test('existing individual-event verifier behavior remains signature-only', async () => {
+  const [record, invalid, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('invalid-signature.json'),
+    fixture('valid-key.json'),
+  ]);
+  const result = verifySignedEvent(record, [key]);
+
+  assert.equal(result.status, 'signature_valid');
+  assert.equal(result.asset_integrity, 'not_checked');
+  assert.equal(result.history_completeness, 'not_established');
+  assert.equal(
+    result.signed_event_sha256,
+    'e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e',
+  );
+  assert.throws(
+    () => verifySignedEvent(invalid, [key]),
+    error => error?.category === 'signature',
+  );
+});
+
+test('valid graph cryptography never claims package or historical completion', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  const result = verifySignedEventGraph([record], [key]);
+  const serialized = JSON.stringify(result);
+
+  assert.equal(result.status, 'verification_incomplete');
+  assert.equal(result.verificationStatus, 'not_implemented');
+  assert.equal(serialized.includes('CONSISTENT'), false);
+  assert.equal(serialized.includes('VERIFIED'), false);
+  assert.equal(serialized.includes('ESTABLISHED'), false);
 });
 
 test('structurally resolves a single root without claiming cryptographic verification', () => {
