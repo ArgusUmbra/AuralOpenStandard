@@ -863,9 +863,12 @@ def _validate_key_record(raw):
     return _ValidatedKey(document, public_key)
 
 
-def _resolve_public_key(raw_records, signing_key_id):
+def _validate_public_key_records(raw_records):
     keys = {}
-    for raw in raw_records:
+    ordered_records = sorted(
+        raw_records, key=lambda raw: (hashlib.sha256(raw).digest(), raw),
+    )
+    for raw in ordered_records:
         key = _validate_key_record(raw)
         key_id = key.document['key_id']
         if key_id in keys:
@@ -875,6 +878,10 @@ def _resolve_public_key(raw_records, signing_key_id):
                 'duplicate public-key record for key_id',
             )
         keys[key_id] = key
+    return keys
+
+
+def _select_public_key(keys, signing_key_id):
     selected = keys.get(signing_key_id)
     if selected is None:
         _fail(
@@ -883,6 +890,12 @@ def _resolve_public_key(raw_records, signing_key_id):
             'no public-key record matches signing_key_id',
         )
     return selected
+
+
+def _resolve_public_key(raw_records, signing_key_id):
+    return _select_public_key(
+        _validate_public_key_records(raw_records), signing_key_id,
+    )
 
 
 def _ed25519_point_encoding_is_acceptable(encoded):
@@ -1196,13 +1209,15 @@ def _index_signed_event_records(records, limits=None):
     effective = _graph_limits_or_default(limits)
     _validate_graph_record_inputs(records, effective)
 
+    ordered_records = [(_signed_event_sha256(record), record) for record in records]
+    ordered_records.sort(key=lambda item: (item[0], item[1]))
     indexed = []
-    for record in records:
+    for signed_event_sha256, record in ordered_records:
         validated = _parse_validate_record(record)
         indexed.append(_IndexedSignedRecord(
             record=record,
             validated=validated,
-            signed_event_sha256=_signed_event_sha256(record),
+            signed_event_sha256=signed_event_sha256,
         ))
     indexed.sort(key=lambda item: (
         item.validated.assertion['event_id'],
@@ -1347,6 +1362,43 @@ def _validate_package_binding(assertion, package):
         )
 
 
+def _verify_validated_signed_event(
+        record, validated, validated_keys, signed_event_sha256=None,
+):
+    """Verify one already parsed record against one validated key index."""
+    assertion = validated.assertion
+    selected_key = _select_public_key(
+        validated_keys, assertion['signing_key_id'],
+    )
+    signature = _canonical_base64url(
+        validated.document['signature'], 64, 'signature', VerificationStage.SIGNATURE,
+    )
+    assertion_bytes = _jcs_text(
+        assertion, VerificationStage.SIGNATURE,
+    ).encode('utf-8')
+    _verify_ed25519_profile(
+        selected_key.public_key, SIGNATURE_DOMAIN + assertion_bytes, signature,
+    )
+
+    return VerificationResult(
+        status=VerificationStatus.SIGNATURE_VALID,
+        event_id=assertion['event_id'],
+        evidence_id=assertion['evidence_id'],
+        signing_key_id=assertion['signing_key_id'],
+        signed_event_sha256=(signed_event_sha256
+                             if signed_event_sha256 is not None
+                             else _signed_event_sha256(record)),
+        asset_integrity=AssetIntegrityStatus.NOT_CHECKED,
+        investigator_identity=InvestigatorIdentityStatus.NOT_ESTABLISHED,
+        key_trust=KeyTrustStatus.NOT_EVALUATED,
+        time_assurance=(TimeAssuranceStatus.CLAIMED_ONLY
+                        if 'claimed_times' in assertion['claims']
+                        else TimeAssuranceStatus.UNKNOWN),
+        history_completeness=HistoryCompletenessStatus.NOT_ESTABLISHED,
+        declared_parent_count=len(assertion['parents']),
+    )
+
+
 def verify_signed_event(
         record: bytes,
         public_key_records: Sequence[bytes],
@@ -1395,41 +1447,13 @@ def verify_signed_event(
                 'aggregate public-key data exceeds the configured limit',
             )
     validated = _parse_validate_record(record)
-    selected_key = _resolve_public_key(
-        public_key_records, validated.assertion['signing_key_id'],
-    )
-    signature = _canonical_base64url(
-        validated.document['signature'], 64, 'signature', VerificationStage.SIGNATURE,
-    )
-    assertion_bytes = _jcs_text(
-        validated.assertion, VerificationStage.SIGNATURE,
-    ).encode('utf-8')
-    _verify_ed25519_profile(
-        selected_key.public_key, SIGNATURE_DOMAIN + assertion_bytes, signature,
-    )
-
-    assertion = validated.assertion
-    asset_integrity = AssetIntegrityStatus.NOT_CHECKED
+    validated_keys = _validate_public_key_records(public_key_records)
+    result = _verify_validated_signed_event(record, validated, validated_keys)
     if package_path is not None:
         package = _verify_package_for_binding(package_path)
-        _validate_package_binding(assertion, package)
-        asset_integrity = AssetIntegrityStatus.VERIFIED
-
-    return VerificationResult(
-        status=VerificationStatus.SIGNATURE_VALID,
-        event_id=assertion['event_id'],
-        evidence_id=assertion['evidence_id'],
-        signing_key_id=assertion['signing_key_id'],
-        signed_event_sha256=_signed_event_sha256(record),
-        asset_integrity=asset_integrity,
-        investigator_identity=InvestigatorIdentityStatus.NOT_ESTABLISHED,
-        key_trust=KeyTrustStatus.NOT_EVALUATED,
-        time_assurance=(TimeAssuranceStatus.CLAIMED_ONLY
-                        if 'claimed_times' in assertion['claims']
-                        else TimeAssuranceStatus.UNKNOWN),
-        history_completeness=HistoryCompletenessStatus.NOT_ESTABLISHED,
-        declared_parent_count=len(assertion['parents']),
-    )
+        _validate_package_binding(validated.assertion, package)
+        result = replace(result, asset_integrity=AssetIntegrityStatus.VERIFIED)
+    return result
 
 
 def verify_signed_event_files(
@@ -1526,13 +1550,16 @@ def verify_signed_event_graph(
 
     index = _index_signed_event_records(records, effective)
     resolved = _resolve_signed_event_graph(index, effective)
-    verified_events = []
-    for indexed_record in resolved.records:
-        verified_events.append(verify_signed_event(
+    validated_keys = _validate_public_key_records(public_key_records)
+    verified_events = [
+        _verify_validated_signed_event(
             indexed_record.record,
-            public_key_records,
-            limits=effective,
-        ))
+            indexed_record.validated,
+            validated_keys,
+            indexed_record.signed_event_sha256,
+        )
+        for indexed_record in resolved.records
+    ]
 
     if package_path is not None:
         package = _verify_package_for_binding(package_path)

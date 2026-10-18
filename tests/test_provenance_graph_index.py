@@ -79,6 +79,31 @@ class ProvenanceGraphIndexTests(unittest.TestCase):
             lambda: provenance.verify_signed_event_graph([record], []),
         )
 
+    def test_malformed_record_among_valid_records_is_not_excluded(self):
+        valid = self.record('valid-original-acquired.json')
+        malformed = self.record('invalid-noncanonical.json')
+        for records in ([valid, malformed], [malformed, valid]):
+            with self.subTest(records=records):
+                self.assert_error(
+                    provenance.ErrorCategory.CANONICALIZATION,
+                    provenance.VerificationStage.RECORD,
+                    lambda records=records: provenance.verify_signed_event_graph(
+                        records, [self.record('valid-key.json')],
+                    ),
+                )
+
+    def test_competing_malformed_record_error_is_order_independent(self):
+        records = [
+            self.record('invalid-noncanonical.json'),
+            self.record('invalid-bom.json'),
+        ]
+        outcomes = []
+        for ordered in (records, list(reversed(records))):
+            with self.assertRaises(provenance.ProvenanceVerificationError) as raised:
+                provenance.verify_signed_event_graph(ordered, [])
+            outcomes.append((raised.exception.category, raised.exception.stage))
+        self.assertEqual(outcomes[0], outcomes[1])
+
 
 if __name__ == '__main__':
     unittest.main()

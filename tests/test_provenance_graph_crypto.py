@@ -1,10 +1,13 @@
 import base64
+import copy
+import hashlib
 import json
 from pathlib import Path
 import unittest
 from unittest import mock
 
 from aural import provenance
+from tests._provenance_graph_helpers import signed_record
 
 
 FIXTURES = Path(__file__).parent / 'fixtures' / 'provenance'
@@ -44,7 +47,8 @@ class ProvenanceGraphCryptographicTests(unittest.TestCase):
             self.record('valid-original-acquired.json'),
         ]
         with mock.patch.object(
-                provenance, 'verify_signed_event', wraps=provenance.verify_signed_event) as verify:
+                provenance, '_verify_validated_signed_event',
+                wraps=provenance._verify_validated_signed_event) as verify:
             result = provenance.verify_signed_event_graph(
                 records,
                 [self.record('valid-key.json')],
@@ -54,11 +58,113 @@ class ProvenanceGraphCryptographicTests(unittest.TestCase):
         self.assertEqual(3, len(result.events))
         self.assertEqual(2, result.maximum_depth)
 
+    def test_graph_parses_each_bounded_record_and_key_once(self):
+        records = [
+            self.record('valid-received-with-parent.json'),
+            self.record('valid-unknown-optional.json'),
+            self.record('valid-original-acquired.json'),
+        ]
+        key = self.record('valid-key.json')
+        with mock.patch.object(
+                provenance, '_parse_validate_record',
+                wraps=provenance._parse_validate_record) as parse_event, mock.patch.object(
+                    provenance, '_validate_key_record',
+                    wraps=provenance._validate_key_record) as parse_key, mock.patch.object(
+                        provenance, '_signed_event_sha256',
+                        wraps=provenance._signed_event_sha256) as hash_event:
+            result = provenance.verify_signed_event_graph(records, [key])
+
+        self.assertEqual(provenance.GraphVerificationStatus.CONSISTENT, result.status)
+        self.assertEqual(len(records), parse_event.call_count)
+        self.assertEqual(1, parse_key.call_count)
+        self.assertEqual(len(records), hash_event.call_count)
+
     def test_tampered_signature_fails_cryptographic_verification(self):
         self.assert_error(
             provenance.ErrorCategory.SIGNATURE,
             provenance.VerificationStage.SIGNATURE,
             [self.record('invalid-signature.json')],
+            [self.record('valid-key.json')],
+        )
+
+    def test_assertion_modification_without_resigning_fails(self):
+        document = json.loads(self.record('valid-unknown-optional.json'))
+        document['assertion']['claims']['source_description'] = 'attacker replacement'
+        tampered = provenance._jcs_text(
+            document, provenance.VerificationStage.RECORD,
+        ).encode('utf-8')
+        self.assert_error(
+            provenance.ErrorCategory.SIGNATURE,
+            provenance.VerificationStage.SIGNATURE,
+            [self.record('valid-original-acquired.json'), tampered],
+            [self.record('valid-key.json')],
+        )
+
+    def test_wrong_valid_public_key_cannot_be_associated_with_signature(self):
+        public_key = bytes.fromhex(
+            '3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c'
+        )
+        unrelated = {
+            'algorithm': 'Ed25519',
+            'key_id': 'urn:aural:key:ed25519:' + hashlib.sha256(
+                provenance.KEY_ID_DOMAIN + public_key,
+            ).hexdigest(),
+            'key_schema': 'org.aural.signing-key',
+            'key_schema_version': '1',
+            'public_key': base64.urlsafe_b64encode(public_key).rstrip(b'=').decode('ascii'),
+        }
+        unrelated_raw = provenance._jcs_text(
+            unrelated, provenance.VerificationStage.KEY,
+        ).encode('utf-8')
+        record = self.record('valid-original-acquired.json')
+        self.assert_error(
+            provenance.ErrorCategory.MISSING_KEY,
+            provenance.VerificationStage.KEY,
+            [record],
+            [unrelated_raw],
+        )
+        result = provenance.verify_signed_event_graph(
+            [record], [unrelated_raw, self.record('valid-key.json')],
+        )
+        self.assertEqual(provenance.GraphVerificationStatus.CONSISTENT, result.status)
+
+    def test_duplicate_supplied_key_id_is_rejected_as_ambiguous(self):
+        key = self.record('valid-key.json')
+        self.assert_error(
+            provenance.ErrorCategory.DUPLICATE_KEY,
+            provenance.VerificationStage.KEY,
+            [self.record('valid-original-acquired.json')],
+            [key, key],
+        )
+
+    def test_competing_malformed_key_error_is_order_independent(self):
+        records = [self.record('valid-original-acquired.json')]
+        keys = [
+            self.record('key-invalid-algorithm.json'),
+            self.record('key-invalid-encoding.json'),
+        ]
+        outcomes = []
+        for ordered in (keys, list(reversed(keys))):
+            with self.assertRaises(provenance.ProvenanceVerificationError) as raised:
+                provenance.verify_signed_event_graph(records, ordered)
+            outcomes.append((raised.exception.category, raised.exception.stage))
+        self.assertEqual(outcomes[0], outcomes[1])
+
+    def test_valid_signature_with_incorrect_parent_digest_fails_graph_resolution(self):
+        parent = self.record('valid-original-acquired.json')
+        child = json.loads(self.record('valid-received-with-parent.json'))['assertion']
+        child = copy.deepcopy(child)
+        child['parents'][0]['signed_event_digest']['value'] = '0' * 64
+        signed_child = signed_record(child)
+
+        individual = provenance.verify_signed_event(
+            signed_child, [self.record('valid-key.json')],
+        )
+        self.assertEqual(provenance.VerificationStatus.SIGNATURE_VALID, individual.status)
+        self.assert_error(
+            provenance.ErrorCategory.PARENT_DIGEST_MISMATCH,
+            provenance.VerificationStage.GRAPH,
+            [parent, signed_child],
             [self.record('valid-key.json')],
         )
 
@@ -97,7 +203,8 @@ class ProvenanceGraphCryptographicTests(unittest.TestCase):
         record = self.record('valid-original-acquired.json')
         key = self.record('valid-key.json')
         with mock.patch.object(
-                provenance, 'verify_signed_event', wraps=provenance.verify_signed_event) as verify:
+                provenance, '_verify_validated_signed_event',
+                wraps=provenance._verify_validated_signed_event) as verify:
             result = provenance.verify_signed_event_graph(
                 [record, record, record], [key],
             )

@@ -1,8 +1,11 @@
+import copy
+import json
 from pathlib import Path
 import unittest
 from unittest import mock
 
 from aural import provenance
+from tests._provenance_graph_helpers import signed_record
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -139,6 +142,31 @@ class ProvenanceGraphBindingTests(unittest.TestCase):
                 ),
             )
         self.assertEqual(1, package_verify.call_count)
+
+    def test_one_matching_event_cannot_hide_another_subject_mismatch(self):
+        valid = self.record('valid-original-acquired.json')
+        assertion = copy.deepcopy(json.loads(valid)['assertion'])
+        assertion['event_id'] = 'urn:uuid:11111111-2222-4333-b444-555555555555'
+        assertion['subject']['original']['sha256'] = '0' * 64
+        mismatched = signed_record(assertion)
+        key = self.record('valid-key.json')
+
+        with mock.patch.object(
+                provenance.core, 'verify_detailed',
+                wraps=provenance.core.verify_detailed) as package_verify, mock.patch.object(
+                    provenance, '_validate_package_binding',
+                    wraps=provenance._validate_package_binding) as bind, mock.patch.object(
+                        provenance, 'replace', wraps=provenance.replace) as replace_result:
+            self.assert_package_error(
+                provenance.ErrorCategory.SUBJECT_BINDING,
+                lambda: provenance.verify_signed_event_graph(
+                    [mismatched, valid], [key], package_path=VALID_PACKAGE,
+                ),
+            )
+
+        self.assertEqual(1, package_verify.call_count)
+        self.assertEqual(2, bind.call_count)
+        replace_result.assert_not_called()
 
 
 if __name__ == '__main__':
