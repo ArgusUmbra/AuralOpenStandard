@@ -1474,7 +1474,11 @@ def verify_signed_event_graph(
         package_path: Optional[PathLike] = None,
         limits: Optional[GraphVerificationLimits] = None,
 ) -> GraphVerificationResult:
-    """Preflight a detached signed-event graph; graph validation is pending."""
+    """Verify graph structure and each unique signature; completion is pending.
+
+    Individual-event failures retain their existing categories and stages.  The
+    graph ``package_path`` remains reserved until package binding is integrated.
+    """
     effective = _graph_limits_or_default(limits)
     _validate_graph_record_inputs(records, effective)
 
@@ -1508,7 +1512,13 @@ def verify_signed_event_graph(
             )
 
     index = _index_signed_event_records(records, effective)
-    _resolve_signed_event_graph(index, effective)
+    resolved = _resolve_signed_event_graph(index, effective)
+    for indexed_record in resolved.records:
+        verify_signed_event(
+            indexed_record.record,
+            public_key_records,
+            limits=effective,
+        )
     raise ProvenanceVerificationError(
         ErrorCategory.NOT_IMPLEMENTED,
         VerificationStage.GRAPH,

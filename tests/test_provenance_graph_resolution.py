@@ -296,12 +296,12 @@ class ProvenanceGraphResolutionTests(unittest.TestCase):
         )
 
     def test_public_verifier_resolves_then_remains_fail_closed(self):
-        builder = _GraphBuilder()
-        root = builder.add(2)
-        child = builder.add(1, [2])
+        root = (FIXTURES / 'valid-original-acquired.json').read_bytes()
+        child = (FIXTURES / 'valid-received-with-parent.json').read_bytes()
+        key = (FIXTURES / 'valid-key.json').read_bytes()
         self.assert_error(
             provenance.ErrorCategory.NOT_IMPLEMENTED,
-            lambda: provenance.verify_signed_event_graph([child, root], []),
+            lambda: provenance.verify_signed_event_graph([child, root], [key]),
         )
 
 
