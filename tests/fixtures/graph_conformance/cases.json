@@ -1,7 +1,7 @@
 {
   "schema": "org.aural.graph-conformance-cases",
   "schema_version": "1",
-  "description": "Shared positive signed-event graph cases for independent Python and Node.js verification.",
+  "description": "Shared positive and negative signed-event graph cases for independent Python and Node.js verification.",
   "events": {
     "root": {
       "path": "../provenance/valid-original-acquired.json",
@@ -46,13 +46,20 @@
       "key_trust": "not_evaluated",
       "time_assurance": "claimed_only",
       "history_completeness": "not_established"
+    },
+    "invalid_signature": {
+      "path": "../provenance/invalid-signature.json"
+    },
+    "parent_digest_mismatch": {
+      "path": "parent-digest-mismatch.json"
     }
   },
   "public_keys": {
     "test_key": "../provenance/valid-key.json"
   },
   "packages": {
-    "matching": "../conformance/valid-unicode.aural"
+    "matching": "../conformance/valid-unicode.aural",
+    "unrelated": "../conformance/valid-independent.aural"
   },
   "cases": [
     {
@@ -181,6 +188,59 @@
         "declared_parent_count": 2,
         "maximum_depth": 2,
         "ordered_events": ["root", "second_root", "multi_parent"]
+      }
+    },
+    {
+      "id": "N01-invalid-ed25519-signature",
+      "purpose": "A structurally valid canonical event is rejected when its Ed25519 signature is invalid.",
+      "signed_events": ["invalid_signature"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "signature",
+          "stage": "signature"
+        }
+      }
+    },
+    {
+      "id": "N02-missing-declared-parent",
+      "purpose": "A valid signed child is rejected when its declared parent is omitted from the supplied records.",
+      "signed_events": ["child"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "missing_parent",
+          "stage": "graph"
+        }
+      }
+    },
+    {
+      "id": "N03-parent-digest-mismatch",
+      "purpose": "A genuinely signed child is rejected when its supplied parent's signed-event digest does not match the declared reference.",
+      "signed_events": ["parent_digest_mismatch", "root"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "parent_digest_mismatch",
+          "stage": "graph"
+        }
+      }
+    },
+    {
+      "id": "N04-unrelated-valid-package",
+      "purpose": "A genuine signed root is rejected when bound to an independently valid package with a different manifest subject.",
+      "signed_events": ["root"],
+      "public_keys": ["test_key"],
+      "package": "unrelated",
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "subject_binding",
+          "stage": "package"
+        }
       }
     }
   ]

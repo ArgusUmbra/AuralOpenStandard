@@ -11,7 +11,7 @@ from aural import provenance
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / 'tests' / 'fixtures' / 'graph_conformance' / 'cases.json'
 NODE_ADAPTER = ROOT / 'tests' / 'graph_conformance_node_adapter.mjs'
-REQUIRED_CASE_IDS = frozenset({
+REQUIRED_POSITIVE_CASE_IDS = frozenset({
     'A-signed-root-no-package',
     'B-signed-root-matching-package',
     'C-parent-child',
@@ -20,6 +20,13 @@ REQUIRED_CASE_IDS = frozenset({
     'F-multi-parent-history',
     'G-input-order-independence',
 })
+REQUIRED_NEGATIVE_CASE_IDS = frozenset({
+    'N01-invalid-ed25519-signature',
+    'N02-missing-declared-parent',
+    'N03-parent-digest-mismatch',
+    'N04-unrelated-valid-package',
+})
+REQUIRED_CASE_IDS = REQUIRED_POSITIVE_CASE_IDS | REQUIRED_NEGATIVE_CASE_IDS
 
 # This is the deliberately narrow public-API mapping. Python aggregate fields
 # are snake_case while Node aggregate fields are camelCase. Event result fields
@@ -187,6 +194,8 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
 
     def expected_result(self, test_case):
         expected = dict(test_case['expected'])
+        if not expected['accepted']:
+            return expected
         ordered_aliases = expected.pop('ordered_events')
         expected['ordered_event_ids'] = [
             self.events[alias]['event_id'] for alias in ordered_aliases
@@ -213,7 +222,6 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                 'error': {
                     'category': error.category.value,
                     'stage': error.stage.value,
-                    'message': str(error),
                 },
             }
         else:
@@ -348,7 +356,10 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                 if 'error' in node_case:
                     node_result = {
                         'accepted': False,
-                        'error': node_case['error'],
+                        'error': {
+                            'category': node_case['error']['category'],
+                            'stage': node_case['error']['stage'],
+                        },
                     }
                     expected = self.expected_result(test_case)
                     all_diagnostics.extend(self.mismatch_lines(
@@ -357,9 +368,10 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                     python_by_id[case_id] = python_result
                     node_by_id[case_id] = node_result
                     continue
-                self.assert_node_only_claims(test_case, node_case['result'])
                 node_result = normalize_node(node_case['result'])
                 expected = self.expected_result(test_case)
+                if expected['accepted']:
+                    self.assert_node_only_claims(test_case, node_case['result'])
                 all_diagnostics.extend(self.mismatch_lines(
                     case_id, python_result, node_result, expected,
                 ))
