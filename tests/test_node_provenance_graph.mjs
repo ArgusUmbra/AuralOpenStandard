@@ -24,9 +24,12 @@ import {
   signedEventSha256,
   verifySignedEvent,
 } from '../interop/validate_provenance.mjs';
+import { verifyDetailed as verifyAuralDetailed } from '../interop/validate_aural.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(ROOT, 'fixtures', 'provenance');
+const PACKAGE_FIXTURES = join(ROOT, 'fixtures', 'conformance');
+const MATCHING_PACKAGE = join(PACKAGE_FIXTURES, 'valid-unicode.aural');
 const KEY_ID_DOMAIN = Buffer.from('AURAL-KEY-ID-V1\0Ed25519\0', 'ascii');
 const SIGNATURE_DOMAIN = Buffer.from('AURAL-PROVENANCE-EVENT-V1\0', 'ascii');
 
@@ -123,7 +126,7 @@ class GenuineSignedGraphBuilder extends GraphBuilder {
     return { keyId, keyRecord, privateKey };
   }
 
-  addSigned(number, signer, parentNumbers = []) {
+  addSigned(number, signer, parentNumbers = [], customizeAssertion = undefined) {
     const parents = parentNumbers.map(parentNumber => {
       const record = this.records.get(parentNumber);
       assert.ok(record, `parent ${parentNumber} must be built first`);
@@ -132,6 +135,7 @@ class GenuineSignedGraphBuilder extends GraphBuilder {
     const document = this.document(number, parents);
     document.assertion.signing_key_id = signer.keyId;
     document.assertion.claims.acquiring_key_id = signer.keyId;
+    if (customizeAssertion !== undefined) customizeAssertion(document.assertion);
     const assertionBytes = Buffer.from(canonicalJson(document.assertion), 'utf8');
     document.signature = signMessage(
       null,
@@ -182,6 +186,13 @@ function capturedError(operation) {
   }
   assert.ok(captured, 'operation unexpectedly succeeded');
   return [captured.category, captured.stage, captured.message];
+}
+
+async function expectGraphError(category, stage, operation) {
+  await assert.rejects(
+    Promise.resolve().then(operation),
+    expectError(category, stage),
+  );
 }
 
 test('indexes one canonical event without claiming graph verification', async () => {
@@ -561,6 +572,234 @@ test('valid graph cryptography never claims package or historical completion', a
   assert.equal(serialized.includes('CONSISTENT'), false);
   assert.equal(serialized.includes('VERIFIED'), false);
   assert.equal(serialized.includes('ESTABLISHED'), false);
+});
+
+test('matching package binds one signed event on all six exact subject fields', async () => {
+  const [record, key, metadata] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+    verifyAuralDetailed(MATCHING_PACKAGE),
+  ]);
+  const subject = JSON.parse(record).assertion.subject;
+  assert.deepEqual(
+    [
+      subject.format,
+      subject.version,
+      subject.manifest_sha256,
+      subject.original.path,
+      subject.original.sha256,
+      subject.original.byte_length,
+    ],
+    [
+      metadata.format,
+      metadata.version,
+      metadata.manifest_sha256,
+      metadata.original_path,
+      metadata.audio_sha256,
+      metadata.audio_bytes,
+    ],
+  );
+
+  const result = await verifySignedEventGraph(
+    [record], [key], { packagePath: MATCHING_PACKAGE },
+  );
+  assert.equal(result.status, 'verification_incomplete');
+  assert.equal(result.verificationStatus, 'not_implemented');
+  assert.equal(result.signatureVerification, 'valid');
+  assert.equal(result.packageIntegrity, 'verified');
+  assert.equal(result.subjectBinding, 'verified');
+  assert.equal(result.historyCompleteness, 'not_established');
+  assert.equal(result.events[0].asset_integrity, 'verified');
+  assert.equal(result.events[0].investigator_identity, 'not_established');
+  assert.notEqual(result.events[0].time_assurance, 'trusted');
+});
+
+test('matching package binds every unique event in a signed multi-event graph', async () => {
+  const [root, child, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-received-with-parent.json'),
+    fixture('valid-key.json'),
+  ]);
+  const result = await verifySignedEventGraph(
+    [child, root], [key], { packagePath: MATCHING_PACKAGE },
+  );
+
+  assert.equal(result.recordCount, 2);
+  assert.equal(result.packageIntegrity, 'verified');
+  assert.equal(result.subjectBinding, 'verified');
+  assert.equal(result.events.every(event => event.asset_integrity === 'verified'), true);
+});
+
+test('matching package is verified once and duplicate events bind once logically', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  let calls = 0;
+  const invocationObserver = () => {
+    calls += 1;
+  };
+  const result = await __testing.verifySignedEventGraphWithPackageObserver(
+    [record, record, record],
+    [key],
+    { packagePath: MATCHING_PACKAGE },
+    invocationObserver,
+  );
+
+  assert.equal(calls, 1);
+  assert.equal(result.recordCount, 1);
+  assert.equal(result.duplicateRecordCount, 2);
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].asset_integrity, 'verified');
+});
+
+test('no-package behavior remains synchronous and package integrity is not checked', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  let calls = 0;
+  const result = __testing.verifySignedEventGraphWithPackageObserver(
+    [record], [key], {}, () => { calls += 1; },
+  );
+
+  assert.equal(result instanceof Promise, false);
+  assert.equal(calls, 0);
+  assert.equal(result.packageIntegrity, 'not_checked');
+  assert.equal('subjectBinding' in result, false);
+  assert.equal(result.events[0].asset_integrity, 'not_checked');
+});
+
+test('an unrelated valid package fails subject binding', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  await expectGraphError('subject_binding', 'package', () => verifySignedEventGraph(
+    [record],
+    [key],
+    { packagePath: join(PACKAGE_FIXTURES, 'valid-minimal.aural') },
+  ));
+});
+
+test('one matching event cannot hide another genuinely signed subject mismatch', async () => {
+  const builder = new GenuineSignedGraphBuilder();
+  const signer = builder.signer();
+  const matching = builder.addSigned(1, signer);
+  const mismatched = builder.addSigned(2, signer, [], assertion => {
+    assertion.subject.original.sha256 = '0'.repeat(64);
+  });
+
+  await expectGraphError('subject_binding', 'package', () => verifySignedEventGraph(
+    [mismatched, matching], [signer.keyRecord], { packagePath: MATCHING_PACKAGE },
+  ));
+});
+
+test('tampered audio, manifest, malformed, and unsupported packages fail integrity', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  const invalidPackages = [
+    'invalid-altered-original.aural',
+    'invalid-malformed-json.aural',
+    'invalid-noncanonical.aural',
+    'invalid-malformed-local-header.aural',
+    'legacy-0.1.aural',
+  ];
+  for (const packageName of invalidPackages) {
+    await expectGraphError('package_integrity', 'package', () => verifySignedEventGraph(
+      [record],
+      [key],
+      { packagePath: join(PACKAGE_FIXTURES, packageName) },
+    ));
+  }
+});
+
+test('each incorrect signed subject field fails closed with a genuine signature', async () => {
+  const cases = [
+    ['unsupported_version', assertion => {
+      assertion.subject.format = 'org.example.audio-evidence';
+    }],
+    ['unsupported_version', assertion => {
+      assertion.subject.version = '0.1';
+    }],
+    ['subject_binding', assertion => {
+      assertion.subject.manifest_sha256 = '0'.repeat(64);
+    }],
+    ['schema', assertion => {
+      assertion.subject.original.path = 'audio/elsewhere.wav';
+    }],
+    ['subject_binding', assertion => {
+      assertion.subject.original.sha256 = '0'.repeat(64);
+    }],
+    ['subject_binding', assertion => {
+      assertion.subject.original.byte_length += 1;
+    }],
+  ];
+
+  for (const [category, customize] of cases) {
+    const builder = new GenuineSignedGraphBuilder();
+    const signer = builder.signer();
+    const record = builder.addSigned(1, signer, [], customize);
+    const stage = category === 'subject_binding' ? 'package' : 'record';
+    await expectGraphError(category, stage, () => verifySignedEventGraph(
+      [record], [signer.keyRecord], { packagePath: MATCHING_PACKAGE },
+    ));
+  }
+});
+
+test('missing signed subject binding fields fail before package verification', async () => {
+  const builder = new GenuineSignedGraphBuilder();
+  const signer = builder.signer();
+  const record = builder.addSigned(1, signer, [], assertion => {
+    delete assertion.subject.original.byte_length;
+  });
+  let calls = 0;
+
+  await expectGraphError('schema', 'record', () => (
+    __testing.verifySignedEventGraphWithPackageObserver(
+      [record],
+      [signer.keyRecord],
+      { packagePath: MATCHING_PACKAGE },
+      () => { calls += 1; },
+    )
+  ));
+  assert.equal(calls, 0);
+});
+
+test('caller-supplied package metadata cannot substitute for an archive path', async () => {
+  const [record, key, forgedMetadata] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+    verifyAuralDetailed(MATCHING_PACKAGE),
+  ]);
+
+  assert.throws(
+    () => verifySignedEventGraph([record], [key], { packageMetadata: forgedMetadata }),
+    expectError('configuration', 'input'),
+  );
+  await expectGraphError('package_integrity', 'package', () => verifySignedEventGraph(
+    [record], [key], { packagePath: forgedMetadata },
+  ));
+});
+
+test('invalid signature fails despite an otherwise matching package', async () => {
+  const [record, key] = await Promise.all([
+    fixture('invalid-signature.json'),
+    fixture('valid-key.json'),
+  ]);
+  let calls = 0;
+  assert.throws(
+    () => __testing.verifySignedEventGraphWithPackageObserver(
+      [record],
+      [key],
+      { packagePath: MATCHING_PACKAGE },
+      () => { calls += 1; },
+    ),
+    expectError('signature', 'signature'),
+  );
+  assert.equal(calls, 0);
 });
 
 test('structurally resolves a single root without claiming cryptographic verification', () => {

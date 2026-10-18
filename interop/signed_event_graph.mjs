@@ -4,6 +4,7 @@ import {
   signedEventSha256,
   validateSignedEventRecord,
 } from './validate_provenance.mjs';
+import { verifyDetailed as verifyAuralDetailed } from './validate_aural.mjs';
 
 export const MAX_GRAPH_EVENT_RECORDS = 4096;
 export const MAX_AGGREGATE_GRAPH_EVENT_BYTES = 64 * 1024 * 1024;
@@ -26,11 +27,12 @@ const RESOLUTION_LIMIT_NAMES = new Set([
   'maxGraphDepth',
 ]);
 
-const VERIFICATION_LIMIT_NAMES = new Set([
+const VERIFICATION_OPTION_NAMES = new Set([
   ...INDEX_LIMIT_NAMES,
   ...RESOLUTION_LIMIT_NAMES,
   'maxKeyRecords',
   'maxKeyData',
+  'packagePath',
 ]);
 
 export class SignedEventGraphError extends Error {
@@ -92,14 +94,15 @@ function resolutionLimits(options) {
 }
 
 function verificationLimits(options) {
-  checkOptions(options, VERIFICATION_LIMIT_NAMES, 'graph verification');
+  checkOptions(options, VERIFICATION_OPTION_NAMES, 'graph verification');
+  const select = names => Object.fromEntries(
+    Object.keys(options)
+      .filter(name => names.has(name))
+      .map(name => [name, options[name]]),
+  );
   return Object.freeze({
-    indexing: indexingLimits(Object.fromEntries(
-      Object.entries(options).filter(([name]) => INDEX_LIMIT_NAMES.has(name)),
-    )),
-    resolution: resolutionLimits(Object.fromEntries(
-      Object.entries(options).filter(([name]) => RESOLUTION_LIMIT_NAMES.has(name)),
-    )),
+    indexing: indexingLimits(select(INDEX_LIMIT_NAMES)),
+    resolution: resolutionLimits(select(RESOLUTION_LIMIT_NAMES)),
     keys: Object.freeze({
       maxKeyRecords: configuredLimit(options, 'maxKeyRecords', MAX_GRAPH_KEY_RECORDS, 0),
       maxKeyData: configuredLimit(
@@ -477,8 +480,86 @@ function graphVerificationFailure(error, stage) {
   throw error;
 }
 
-export function verifySignedEventGraph(records, keyRecordRaws, options = {}) {
+function validVerifiedPackageMetadata(metadata) {
+  return metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
+    && metadata.status === 'integrity_valid'
+    && metadata.format === 'org.aural.audio-evidence'
+    && metadata.version === '0.2-draft'
+    && typeof metadata.manifest_sha256 === 'string'
+    && /^[0-9a-f]{64}$/.test(metadata.manifest_sha256)
+    && metadata.original_path === 'audio/original.wav'
+    && typeof metadata.audio_sha256 === 'string'
+    && /^[0-9a-f]{64}$/.test(metadata.audio_sha256)
+    && Number.isSafeInteger(metadata.audio_bytes)
+    && metadata.audio_bytes >= 0
+    && metadata.audio_bytes <= 8 * 1024 ** 3;
+}
+
+function validatePackageBinding(assertion, metadata) {
+  const subject = assertion.subject;
+  const original = subject.original;
+  if (metadata.format !== subject.format
+      || metadata.version !== subject.version
+      || metadata.manifest_sha256 !== subject.manifest_sha256
+      || metadata.original_path !== original.path
+      || metadata.audio_sha256 !== original.sha256
+      || metadata.audio_bytes !== original.byte_length) {
+    fail(
+      'subject_binding',
+      'package',
+      'signed subject does not match the independently verified AURAL package',
+    );
+  }
+}
+
+async function bindGraphToPackage(graph, records, packagePath, invocationObserver) {
+  let metadata;
+  try {
+    if (invocationObserver !== undefined) invocationObserver(packagePath);
+    metadata = await verifyAuralDetailed(packagePath);
+  } catch (error) {
+    const detail = error?.auralValidationFailure === true
+      ? error.message : 'package input could not be verified';
+    fail(
+      'package_integrity',
+      'package',
+      `AURAL package verification failed: ${detail}`,
+      { cause: error },
+    );
+  }
+  if (!validVerifiedPackageMetadata(metadata)) {
+    fail(
+      'package_integrity',
+      'package',
+      'AURAL package verifier did not report valid Draft 0.2 integrity metadata',
+    );
+  }
+
+  // Do not construct any bound result until every unique event has matched all
+  // six signed subject fields. Duplicate input records have already collapsed
+  // to one logical record in the index.
+  for (const record of records) validatePackageBinding(record.assertion, metadata);
+
+  const events = graph.events.map(event => deepFreeze({
+    ...event,
+    asset_integrity: 'verified',
+  }));
+  return deepFreeze({
+    ...graph,
+    packageIntegrity: 'verified',
+    subjectBinding: 'verified',
+    events,
+  });
+}
+
+function verifySignedEventGraphInternal(
+  records, keyRecordRaws, options, invocationObserver = undefined,
+) {
+  if (invocationObserver !== undefined && typeof invocationObserver !== 'function') {
+    fail('configuration', 'input', 'package invocation observer must be a function');
+  }
   const limits = verificationLimits(options);
+  const packagePath = options.packagePath;
   const boundedKeyRecords = copyBoundedKeyInputs(keyRecordRaws, limits.keys);
 
   // This public boundary intentionally accepts raw record bytes only. It never
@@ -510,10 +591,10 @@ export function verifySignedEventGraph(records, keyRecordRaws, options = {}) {
     });
   });
 
-  // Parts 008C-2 and 008C-3 have not bound these events to independently
-  // verified packages or established historical completeness. Keep the public
-  // outcome explicitly incomplete even though all supplied signatures are valid.
-  return deepFreeze({
+  // Assignment 008C-3 has not established the final public graph-success
+  // contract or historical completeness. Package binding below is deliberately
+  // scoped and does not change this incomplete graph outcome.
+  const graph = deepFreeze({
     status: 'verification_incomplete',
     verificationStatus: 'not_implemented',
     parentResolution: 'resolved',
@@ -526,6 +607,17 @@ export function verifySignedEventGraph(records, keyRecordRaws, options = {}) {
     eventIds: [...resolved.eventIds],
     events,
   });
+  if (packagePath === undefined) return graph;
+  return bindGraphToPackage(
+    graph, resolved.records, packagePath, invocationObserver,
+  );
+}
+
+export function verifySignedEventGraph(records, keyRecordRaws, options = {}) {
+  // Preserve the established synchronous result when packagePath is absent.
+  // Safe package-path verification performs asynchronous stable-handle I/O, so
+  // a supplied packagePath produces a Promise for the scoped bound result.
+  return verifySignedEventGraphInternal(records, keyRecordRaws, options);
 }
 
 // A narrow test seam for the otherwise infeasible SHA-256 collision branch.
@@ -539,5 +631,12 @@ export const __testing = Object.freeze({
   // Structural-only seam for Phase 008B tests and later Phase 008C integration.
   resolveSignedEventGraphStructure(index, options = {}) {
     return resolveSignedEventGraphStructure(index, options);
+  },
+  verifySignedEventGraphWithPackageObserver(
+    records, keyRecordRaws, options, invocationObserver,
+  ) {
+    return verifySignedEventGraphInternal(
+      records, keyRecordRaws, options, invocationObserver,
+    );
   },
 });
