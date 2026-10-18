@@ -215,6 +215,54 @@ class ProvenanceGraphResolutionTests(unittest.TestCase):
             lambda: provenance.verify_signed_event_graph([root, mismatch], []),
         )
 
+    def test_missing_parent_is_independent_of_input_order(self):
+        builder = _GraphBuilder()
+        unrelated = builder.add(3)
+        missing = builder.encode(builder.document(1, [
+            (builder.event_id(2), '0' * 64),
+        ]))
+
+        for records in ([missing, unrelated], [unrelated, missing]):
+            with self.subTest(records=records):
+                self.assert_error(
+                    provenance.ErrorCategory.MISSING_PARENT,
+                    lambda records=records: self.resolve(records),
+                )
+
+    def test_parent_digest_mismatch_is_independent_of_input_order(self):
+        builder = _GraphBuilder()
+        parent = builder.add(2)
+        unrelated = builder.add(3)
+        mismatch = builder.encode(builder.document(1, [
+            (builder.event_id(2), '0' * 64),
+        ]))
+
+        records = [mismatch, parent, unrelated]
+        for ordered_records in (records, list(reversed(records))):
+            with self.subTest(records=ordered_records):
+                self.assert_error(
+                    provenance.ErrorCategory.PARENT_DIGEST_MISMATCH,
+                    lambda records=ordered_records: self.resolve(records),
+                )
+
+    def test_multiple_structural_faults_use_event_id_precedence(self):
+        builder = _GraphBuilder()
+        mismatch_parent = builder.add(20)
+        mismatch = builder.encode(builder.document(10, [
+            (builder.event_id(20), '0' * 64),
+        ]))
+        missing = builder.encode(builder.document(30, [
+            (builder.event_id(40), '0' * 64),
+        ]))
+
+        records = [missing, mismatch_parent, mismatch]
+        for ordered_records in (records, list(reversed(records))):
+            with self.subTest(records=ordered_records):
+                self.assert_error(
+                    provenance.ErrorCategory.PARENT_DIGEST_MISMATCH,
+                    lambda records=ordered_records: self.resolve(records),
+                )
+
     def test_self_cycle_is_detected_defensively(self):
         index = self.synthetic_index({1: [1]})
         self.assert_error(
