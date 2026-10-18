@@ -1,0 +1,187 @@
+{
+  "schema": "org.aural.graph-conformance-cases",
+  "schema_version": "1",
+  "description": "Shared positive signed-event graph cases for independent Python and Node.js verification.",
+  "events": {
+    "root": {
+      "path": "../provenance/valid-original-acquired.json",
+      "event_id": "urn:uuid:11111111-2222-4333-8444-555555555555",
+      "signed_event_sha256": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e",
+      "parent_count": 0,
+      "signature_verification": "signature_valid",
+      "investigator_identity": "not_established",
+      "key_trust": "not_evaluated",
+      "time_assurance": "claimed_only",
+      "history_completeness": "not_established"
+    },
+    "second_root": {
+      "path": "../provenance/valid-unknown-optional.json",
+      "event_id": "urn:uuid:11111111-2222-4333-9444-555555555555",
+      "signed_event_sha256": "6ca603ec338e14aefa93510dbd727b2b31048bfe5cfa3b627c1130b34ea7cbea",
+      "parent_count": 0,
+      "signature_verification": "signature_valid",
+      "investigator_identity": "not_established",
+      "key_trust": "not_evaluated",
+      "time_assurance": "claimed_only",
+      "history_completeness": "not_established"
+    },
+    "child": {
+      "path": "../provenance/valid-received-with-parent.json",
+      "event_id": "urn:uuid:11111111-2222-4333-a444-555555555555",
+      "signed_event_sha256": "046f625d475a05f792d7f41354e12e016c2e32690034f157515b63337384937d",
+      "parent_count": 1,
+      "signature_verification": "signature_valid",
+      "investigator_identity": "not_established",
+      "key_trust": "not_evaluated",
+      "time_assurance": "claimed_only",
+      "history_completeness": "not_established"
+    },
+    "multi_parent": {
+      "path": "valid-multi-parent.json",
+      "event_id": "urn:uuid:11111111-2222-4333-a444-555555555555",
+      "signed_event_sha256": "9656cab8765ad6c4741424c0eb71f6dd3f5faad243a08510b1c690005496de05",
+      "parent_count": 2,
+      "signature_verification": "signature_valid",
+      "investigator_identity": "not_established",
+      "key_trust": "not_evaluated",
+      "time_assurance": "claimed_only",
+      "history_completeness": "not_established"
+    }
+  },
+  "public_keys": {
+    "test_key": "../provenance/valid-key.json"
+  },
+  "packages": {
+    "matching": "../conformance/valid-unicode.aural"
+  },
+  "cases": [
+    {
+      "id": "A-signed-root-no-package",
+      "purpose": "One genuine signed root with no package supplied.",
+      "signed_events": ["root"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 1,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 0,
+        "maximum_depth": 1,
+        "ordered_events": ["root"]
+      }
+    },
+    {
+      "id": "B-signed-root-matching-package",
+      "purpose": "The genuine root binds all six subject fields to an independently verified Draft 0.2 package.",
+      "signed_events": ["root"],
+      "public_keys": ["test_key"],
+      "package": "matching",
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "verified",
+        "unique_event_count": 1,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 0,
+        "maximum_depth": 1,
+        "ordered_events": ["root"]
+      }
+    },
+    {
+      "id": "C-parent-child",
+      "purpose": "A genuine child supplied before its genuine parent resolves to exact parent-first order.",
+      "signed_events": ["child", "root"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 2,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 1,
+        "maximum_depth": 2,
+        "ordered_events": ["root", "child"]
+      }
+    },
+    {
+      "id": "D-identical-duplicates",
+      "purpose": "Three byte-identical inputs collapse to one logical event and count two duplicates.",
+      "signed_events": ["root", "root", "root"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 1,
+        "duplicate_input_count": 2,
+        "declared_parent_count": 0,
+        "maximum_depth": 1,
+        "ordered_events": ["root"]
+      }
+    },
+    {
+      "id": "E-independent-roots",
+      "purpose": "Two independent roots use deterministic event-ID order despite reversed input order.",
+      "signed_events": ["second_root", "root"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 2,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 0,
+        "maximum_depth": 1,
+        "ordered_events": ["root", "second_root"]
+      }
+    },
+    {
+      "id": "F-multi-parent-history",
+      "purpose": "A genuinely signed event references two exact genuine parents and follows both in dependency order.",
+      "signed_events": ["multi_parent", "second_root", "root"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 3,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 2,
+        "maximum_depth": 2,
+        "ordered_events": ["root", "second_root", "multi_parent"]
+      }
+    },
+    {
+      "id": "G-input-order-independence",
+      "purpose": "The same multi-parent graph in a different input order has the identical normalized result.",
+      "signed_events": ["root", "multi_parent", "second_root"],
+      "public_keys": ["test_key"],
+      "equivalent_to": "F-multi-parent-history",
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 3,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 2,
+        "maximum_depth": 2,
+        "ordered_events": ["root", "second_root", "multi_parent"]
+      }
+    }
+  ]
+}
