@@ -248,6 +248,56 @@ class ProvenanceGraphFoundationTests(unittest.TestCase):
             )
         self.assertEqual(byte_result, file_result)
 
+    def test_byte_and_file_graph_apis_report_equivalent_missing_parent(self):
+        fixtures = Path(__file__).parent / 'fixtures' / 'provenance'
+        event_path = fixtures / 'valid-received-with-parent.json'
+        key_path = fixtures / 'valid-key.json'
+        byte_error = self.assert_error(
+            provenance.ErrorCategory.MISSING_PARENT,
+            provenance.VerificationStage.GRAPH,
+            lambda: provenance.verify_signed_event_graph(
+                [event_path.read_bytes()], [key_path.read_bytes()],
+            ),
+        )
+        file_error = self.assert_error(
+            provenance.ErrorCategory.MISSING_PARENT,
+            provenance.VerificationStage.GRAPH,
+            lambda: provenance.verify_signed_event_graph_files(
+                [event_path], [key_path],
+            ),
+        )
+        self.assertEqual(
+            (byte_error.category, byte_error.stage),
+            (file_error.category, file_error.stage),
+        )
+
+    def test_byte_and_file_graph_apis_report_equivalent_parent_digest_mismatch(self):
+        fixtures = Path(__file__).parent / 'fixtures' / 'provenance'
+        event_paths = [
+            fixtures / 'valid-received-with-parent.json',
+            fixtures / 'invalid-signature.json',
+        ]
+        key_path = fixtures / 'valid-key.json'
+        byte_error = self.assert_error(
+            provenance.ErrorCategory.PARENT_DIGEST_MISMATCH,
+            provenance.VerificationStage.GRAPH,
+            lambda: provenance.verify_signed_event_graph(
+                [path.read_bytes() for path in event_paths],
+                [key_path.read_bytes()],
+            ),
+        )
+        file_error = self.assert_error(
+            provenance.ErrorCategory.PARENT_DIGEST_MISMATCH,
+            provenance.VerificationStage.GRAPH,
+            lambda: provenance.verify_signed_event_graph_files(
+                event_paths, [key_path],
+            ),
+        )
+        self.assertEqual(
+            (byte_error.category, byte_error.stage),
+            (file_error.category, file_error.stage),
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
