@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 
 import { verifySignedEventGraphDetailed } from '../interop/signed_event_graph.mjs';
+import { verifySignedEvent } from '../interop/validate_provenance.mjs';
 
 function sha256(raw) {
   return createHash('sha256').update(raw).digest('hex');
@@ -23,15 +25,42 @@ async function main() {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
   const base = dirname(manifestPath);
   const cases = {};
+  const bundles = {};
+
+  for (const [alias, fixture] of Object.entries(manifest.bundles ?? {})) {
+    const compressed = await readFile(fixturePath(base, fixture.path));
+    if (sha256(compressed) !== fixture.sha256) {
+      throw new Error(`${alias}: resource bundle SHA-256 does not match manifest pin`);
+    }
+    const document = JSON.parse(gunzipSync(compressed));
+    if (document.schema !== 'org.aural.graph-resource-fixtures'
+        || document.schema_version !== '1'
+        || document.collections === null
+        || typeof document.collections !== 'object'
+        || Array.isArray(document.collections)) {
+      throw new Error(`${alias}: invalid graph-resource fixture bundle`);
+    }
+    bundles[alias] = document;
+  }
 
   for (const testCase of manifest.cases) {
-    const eventPaths = testCase.signed_events.map(
-      alias => fixturePath(base, manifest.events[alias].path),
-    );
     const keyPaths = testCase.public_keys.map(
       alias => fixturePath(base, manifest.public_keys[alias]),
     );
-    const records = await Promise.all(eventPaths.map(path => readFile(path)));
+    let records;
+    if (testCase.resource_bundle !== undefined) {
+      const selection = testCase.resource_bundle;
+      const encoded = bundles[selection.bundle].collections[selection.collection];
+      if (!Array.isArray(encoded)) {
+        throw new Error(`${testCase.id}: resource bundle collection must be an array`);
+      }
+      records = encoded.map(record => Buffer.from(record, 'utf8'));
+    } else {
+      const eventPaths = testCase.signed_events.map(
+        alias => fixturePath(base, manifest.events[alias].path),
+      );
+      records = await Promise.all(eventPaths.map(path => readFile(path)));
+    }
     const keys = await Promise.all(keyPaths.map(path => readFile(path)));
     const packageFixture = testCase.package === undefined
       ? undefined : manifest.packages[testCase.package];
@@ -44,6 +73,15 @@ async function main() {
     };
     if (packagePath !== undefined) {
       evidence.package_input_sha256 = sha256(await readFile(packagePath));
+    }
+    if (testCase.claims?.all_event_signatures_valid === true) {
+      evidence.all_event_signatures_valid = records.every(record => {
+        try {
+          return verifySignedEvent(record, keys).status === 'signature_valid';
+        } catch {
+          return false;
+        }
+      });
     }
     try {
       evidence.result = await verifySignedEventGraphDetailed(records, keys, options);

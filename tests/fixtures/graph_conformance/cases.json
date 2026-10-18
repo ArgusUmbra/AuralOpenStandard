@@ -53,8 +53,20 @@
     "invalid_signature_scalar": {
       "path": "../provenance/invalid-signature-scalar.json"
     },
+    "invalid_noncanonical": {
+      "path": "../provenance/invalid-noncanonical.json"
+    },
+    "invalid_bom": {
+      "path": "../provenance/invalid-bom.json"
+    },
     "parent_digest_mismatch": {
       "path": "parent-digest-mismatch.json"
+    }
+  },
+  "bundles": {
+    "graph_resources": {
+      "path": "graph-resource-cases.json.gz",
+      "sha256": "502b62a1d48c23fb158db53efc39e5838b72863dae13079a7f7610b49c58f0eb"
     }
   },
   "public_keys": {
@@ -214,6 +226,54 @@
       }
     },
     {
+      "id": "H-parent-fanout-64",
+      "purpose": "A genuinely signed event with exactly 64 exact parent references is accepted at the profile boundary.",
+      "resource_bundle": {
+        "bundle": "graph_resources",
+        "collection": "fanout_64"
+      },
+      "public_keys": ["test_key"],
+      "claims": {
+        "all_event_signatures_valid": true
+      },
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 65,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 64,
+        "maximum_depth": 2,
+        "ordered_event_source": "resource_bundle_order"
+      }
+    },
+    {
+      "id": "I-graph-depth-256",
+      "purpose": "A genuinely signed chain whose root-counted maximum depth is exactly 256 is accepted at the profile boundary.",
+      "resource_bundle": {
+        "bundle": "graph_resources",
+        "collection": "depth_256"
+      },
+      "public_keys": ["test_key"],
+      "claims": {
+        "all_event_signatures_valid": true
+      },
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 256,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 255,
+        "maximum_depth": 256,
+        "ordered_event_source": "resource_bundle_order"
+      }
+    },
+    {
       "id": "N01-invalid-ed25519-signature",
       "purpose": "A structurally valid canonical event is rejected when its Ed25519 signature is invalid.",
       "signed_events": ["invalid_signature"],
@@ -370,6 +430,71 @@
         "error": {
           "category": "signature",
           "stage": "signature"
+        }
+      }
+    },
+    {
+      "id": "N13-parent-fanout-65",
+      "purpose": "A genuinely signed event with 65 exact valid parent references is rejected at the graph resource boundary.",
+      "resource_bundle": {
+        "bundle": "graph_resources",
+        "collection": "fanout_65"
+      },
+      "public_keys": ["test_key"],
+      "claims": {
+        "all_event_signatures_valid": true
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "resource_limit",
+          "stage": "graph"
+        }
+      }
+    },
+    {
+      "id": "N14-graph-depth-257",
+      "purpose": "A genuinely signed chain reaching root-counted depth 257 is rejected at the graph resource boundary.",
+      "resource_bundle": {
+        "bundle": "graph_resources",
+        "collection": "depth_257"
+      },
+      "public_keys": ["test_key"],
+      "claims": {
+        "all_event_signatures_valid": true
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "resource_limit",
+          "stage": "graph"
+        }
+      }
+    },
+    {
+      "id": "N15-competing-malformed-forward",
+      "purpose": "Two differently malformed signed-event records deterministically select the same semantic failure in forward input order.",
+      "signed_events": ["invalid_noncanonical", "invalid_bom"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "canonicalization",
+          "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "N16-competing-malformed-reverse",
+      "purpose": "The same malformed records in reverse input order produce the identical deterministic failure.",
+      "signed_events": ["invalid_bom", "invalid_noncanonical"],
+      "public_keys": ["test_key"],
+      "equivalent_to": "N15-competing-malformed-forward",
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "canonicalization",
+          "stage": "record"
         }
       }
     }

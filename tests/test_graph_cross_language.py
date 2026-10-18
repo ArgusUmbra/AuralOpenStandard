@@ -1,3 +1,4 @@
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -34,7 +35,18 @@ REQUIRED_NEGATIVE_CASE_IDS = frozenset({
     'N11-duplicate-public-key-id',
     'N12-invalid-ed25519-profile',
 })
-REQUIRED_CASE_IDS = REQUIRED_POSITIVE_CASE_IDS | REQUIRED_NEGATIVE_CASE_IDS
+REQUIRED_RESOURCE_CASE_IDS = frozenset({
+    'H-parent-fanout-64',
+    'I-graph-depth-256',
+    'N13-parent-fanout-65',
+    'N14-graph-depth-257',
+    'N15-competing-malformed-forward',
+    'N16-competing-malformed-reverse',
+})
+REQUIRED_CASE_IDS = (
+    REQUIRED_POSITIVE_CASE_IDS | REQUIRED_NEGATIVE_CASE_IDS | REQUIRED_RESOURCE_CASE_IDS
+)
+SIGNED_EVENT_DIGEST_DOMAIN = b'AURAL-SIGNED-EVENT-V1\0'
 
 # This is the deliberately narrow public-API mapping. Python aggregate fields
 # are snake_case while Node aggregate fields are camelCase. Event result fields
@@ -177,6 +189,24 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         cls.cases = cls.manifest.get('cases')
         validate_case_inventory(cls.cases)
         cls.events = cls.manifest['events']
+        cls.bundles = {}
+        for alias, fixture in cls.manifest.get('bundles', {}).items():
+            relative = Path(fixture['path'])
+            if relative.is_absolute():
+                raise AssertionError(f'{alias}: resource bundle path must be relative')
+            path = cls.base / relative
+            compressed = path.read_bytes()
+            actual_sha256 = hashlib.sha256(compressed).hexdigest()
+            if actual_sha256 != fixture['sha256']:
+                raise AssertionError(
+                    f'{alias}: resource bundle SHA-256 does not match manifest pin',
+                )
+            document = json.loads(gzip.decompress(compressed))
+            if document.get('schema') != 'org.aural.graph-resource-fixtures' \
+                    or document.get('schema_version') != '1' \
+                    or not isinstance(document.get('collections'), dict):
+                raise AssertionError(f'{alias}: invalid graph-resource fixture bundle')
+            cls.bundles[alias] = document
         cls.node = shutil.which('node')
 
     def fixture_path(self, relative):
@@ -185,10 +215,17 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         return (self.base / path).resolve()
 
     def case_inputs(self, test_case):
-        records = [
-            self.fixture_path(self.events[alias]['path']).read_bytes()
-            for alias in test_case['signed_events']
-        ]
+        if 'resource_bundle' in test_case:
+            selection = test_case['resource_bundle']
+            bundle = self.bundles[selection['bundle']]
+            encoded = bundle['collections'][selection['collection']]
+            self.assertIsInstance(encoded, list)
+            records = [record.encode('utf-8') for record in encoded]
+        else:
+            records = [
+                self.fixture_path(self.events[alias]['path']).read_bytes()
+                for alias in test_case['signed_events']
+            ]
         keys = [
             self.fixture_path(self.manifest['public_keys'][alias]).read_bytes()
             for alias in test_case['public_keys']
@@ -209,19 +246,45 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         expected = dict(test_case['expected'])
         if not expected['accepted']:
             return expected
-        ordered_aliases = expected.pop('ordered_events')
-        expected['ordered_event_ids'] = [
-            self.events[alias]['event_id'] for alias in ordered_aliases
-        ]
-        expected['events'] = []
-        for alias in ordered_aliases:
-            fixture = self.events[alias]
-            expected['events'].append({
-                common: (expected['package_integrity']
-                         if common == 'package_integrity' else fixture[common])
-                for common in EVENT_FIELDS
-            })
+        event_source = expected.pop('ordered_event_source', None)
+        if event_source == 'resource_bundle_order':
+            records, _keys, _package, _package_sha256 = self.case_inputs(test_case)
+            fixtures = []
+            for raw in records:
+                assertion = json.loads(raw)['assertion']
+                fixtures.append({
+                    'event_id': assertion['event_id'],
+                    'signed_event_sha256': hashlib.sha256(
+                        SIGNED_EVENT_DIGEST_DOMAIN + raw,
+                    ).hexdigest(),
+                    'parent_count': len(assertion['parents']),
+                    'signature_verification': 'signature_valid',
+                    'investigator_identity': 'not_established',
+                    'key_trust': 'not_evaluated',
+                    'time_assurance': 'claimed_only',
+                    'history_completeness': 'not_established',
+                })
+        else:
+            ordered_aliases = expected.pop('ordered_events')
+            fixtures = [self.events[alias] for alias in ordered_aliases]
+        expected['ordered_event_ids'] = [fixture['event_id'] for fixture in fixtures]
+        expected['events'] = [{
+            common: (expected['package_integrity']
+                     if common == 'package_integrity' else fixture[common])
+            for common in EVENT_FIELDS
+        } for fixture in fixtures]
         return expected
+
+    def assert_python_case_claims(self, test_case, records, keys):
+        claims = test_case.get('claims', {})
+        if claims.get('all_event_signatures_valid'):
+            for index, record in enumerate(records):
+                result = provenance.verify_signed_event(record, keys)
+                self.assertEqual(
+                    provenance.VerificationStatus.SIGNATURE_VALID,
+                    result.status,
+                    f"{test_case['id']}: record {index} is not genuinely signed",
+                )
 
     def verify_python(self, test_case):
         records, keys, package, package_sha256 = self.case_inputs(test_case)
@@ -322,7 +385,8 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
     def test_python_results_match_independent_expectations(self):
         for test_case in self.cases:
             with self.subTest(case=test_case['id']):
-                _records, _keys, _package_sha256, actual = self.verify_python(test_case)
+                records, keys, _package_sha256, actual = self.verify_python(test_case)
+                self.assert_python_case_claims(test_case, records, keys)
                 expected = self.expected_result(test_case)
                 diagnostics = self.mismatch_lines(
                     test_case['id'], actual, actual, expected,
@@ -356,6 +420,12 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
             with self.subTest(case=case_id):
                 records, keys, package_sha256, python_result = self.verify_python(test_case)
                 node_case = payload['cases'][case_id]
+                self.assert_python_case_claims(test_case, records, keys)
+                if test_case.get('claims', {}).get('all_event_signatures_valid'):
+                    self.assertIs(
+                        True, node_case.get('all_event_signatures_valid'),
+                        f'{case_id}: Node did not validate every fixture signature',
+                    )
                 self.assertEqual(
                     [hashlib.sha256(raw).hexdigest() for raw in records],
                     node_case['event_input_sha256'],
