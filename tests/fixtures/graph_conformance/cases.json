@@ -50,12 +50,17 @@
     "invalid_signature": {
       "path": "../provenance/invalid-signature.json"
     },
+    "invalid_signature_scalar": {
+      "path": "../provenance/invalid-signature-scalar.json"
+    },
     "parent_digest_mismatch": {
       "path": "parent-digest-mismatch.json"
     }
   },
   "public_keys": {
-    "test_key": "../provenance/valid-key.json"
+    "test_key": "../provenance/valid-key.json",
+    "malformed_key": "../provenance/key-invalid-encoding.json",
+    "incorrect_key_id": "../provenance/key-invalid-id.json"
   },
   "packages": {
     "matching": {
@@ -300,6 +305,71 @@
         "error": {
           "category": "package_integrity",
           "stage": "package"
+        }
+      }
+    },
+    {
+      "id": "N08-missing-signing-key",
+      "purpose": "A valid signed root is rejected when no public-key record matches its signing key identifier.",
+      "signed_events": ["root"],
+      "public_keys": [],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "missing_key",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "N09-malformed-public-key",
+      "purpose": "A valid signed root is rejected when the supplied canonical key record uses forbidden padded base64url encoding.",
+      "signed_events": ["root"],
+      "public_keys": ["malformed_key"],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "encoding",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "N10-incorrect-key-id",
+      "purpose": "A valid signed root is rejected when the supplied key record's declared identifier does not match its public-key bytes.",
+      "signed_events": ["root"],
+      "public_keys": ["incorrect_key_id"],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "key_id_mismatch",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "N11-duplicate-public-key-id",
+      "purpose": "A valid signed root is rejected when the same valid public-key record is supplied twice.",
+      "signed_events": ["root"],
+      "public_keys": ["test_key", "test_key"],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "duplicate_key",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "N12-invalid-ed25519-profile",
+      "purpose": "A canonical root with an out-of-range Ed25519 scalar is rejected by the strict signature profile.",
+      "signed_events": ["invalid_signature_scalar"],
+      "public_keys": ["test_key"],
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "signature",
+          "stage": "signature"
         }
       }
     }

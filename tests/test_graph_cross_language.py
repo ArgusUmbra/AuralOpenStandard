@@ -28,6 +28,11 @@ REQUIRED_NEGATIVE_CASE_IDS = frozenset({
     'N05-corrupted-original-audio',
     'N06-invalid-manifest',
     'N07-invalid-zip-structure',
+    'N08-missing-signing-key',
+    'N09-malformed-public-key',
+    'N10-incorrect-key-id',
+    'N11-duplicate-public-key-id',
+    'N12-invalid-ed25519-profile',
 })
 REQUIRED_CASE_IDS = REQUIRED_POSITIVE_CASE_IDS | REQUIRED_NEGATIVE_CASE_IDS
 
