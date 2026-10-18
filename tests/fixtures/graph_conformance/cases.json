@@ -64,6 +64,10 @@
     }
   },
   "bundles": {
+    "graph_event_byte_limits": {
+      "path": "graph-event-byte-limit-cases.json.gz",
+      "sha256": "60c4c6d9ef3933a9fc1736ded925ff9e0e2f59b29e058bf9021879fbedd63d3e"
+    },
     "graph_event_counts": {
       "path": "graph-event-count-cases.json.gz",
       "sha256": "a5f3f3bc2dccdfec7dadc7cc8fafeecb88f7989f1a0791bb8f803b433aa49415"
@@ -274,6 +278,36 @@
         "duplicate_input_count": 0,
         "declared_parent_count": 255,
         "maximum_depth": 256,
+        "ordered_event_source": "resource_bundle_order"
+      }
+    },
+    {
+      "id": "H-event-bytes-at-limit",
+      "purpose": "One canonical genuinely signed record of exactly 1,048,576 bytes is accepted at the per-record boundary.",
+      "resource_bundle": {
+        "bundle": "graph_event_byte_limits",
+        "collection": "event_bytes_at_limit"
+      },
+      "public_keys": ["test_key"],
+      "claims": {
+        "all_event_signatures_valid": true,
+        "signature_evidence": "independent_ed25519",
+        "input_event_count": 1,
+        "distinct_event_id_count": 1,
+        "aggregate_event_bytes": 1048576,
+        "maximum_event_bytes": 1048576,
+        "event_byte_lengths": [1048576]
+      },
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 1,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 0,
+        "maximum_depth": 1,
         "ordered_event_source": "resource_bundle_order"
       }
     },
@@ -502,6 +536,31 @@
         "error": {
           "category": "resource_limit",
           "stage": "graph"
+        }
+      }
+    },
+    {
+      "id": "N-event-bytes-over-limit",
+      "purpose": "One canonical genuinely signed record of exactly 1,048,577 bytes is rejected at the per-record input boundary.",
+      "resource_bundle": {
+        "bundle": "graph_event_byte_limits",
+        "collection": "event_bytes_over_limit"
+      },
+      "public_keys": ["test_key"],
+      "claims": {
+        "all_event_signatures_valid": true,
+        "signature_evidence": "independent_ed25519",
+        "input_event_count": 1,
+        "distinct_event_id_count": 1,
+        "aggregate_event_bytes": 1048577,
+        "maximum_event_bytes": 1048577,
+        "event_byte_lengths": [1048577]
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "resource_limit",
+          "stage": "input"
         }
       }
     },

@@ -4,10 +4,51 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
 import { verifySignedEventGraphDetailed } from '../interop/signed_event_graph.mjs';
-import { verifySignedEvent } from '../interop/validate_provenance.mjs';
+import {
+  verifyEd25519Profile,
+  verifySignedEvent,
+} from '../interop/validate_provenance.mjs';
+
+const SIGNATURE_DOMAIN = Buffer.from('AURAL-PROVENANCE-EVENT-V1\0', 'ascii');
 
 function sha256(raw) {
   return createHash('sha256').update(raw).digest('hex');
+}
+
+function compareText(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+function canonicalJson(value) {
+  if (value === null || typeof value === 'boolean' || typeof value === 'number'
+      || typeof value === 'string') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  return `{${Object.keys(value).sort(compareText).map(
+    key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`,
+  ).join(',')}}`;
+}
+
+function independentlyVerifySignature(record, keyRecords) {
+  try {
+    const document = JSON.parse(record.toString('utf8'));
+    const key = keyRecords.map(raw => JSON.parse(raw.toString('utf8'))).find(
+      item => item.key_id === document.assertion.signing_key_id,
+    );
+    if (key === undefined) return false;
+    const message = Buffer.concat([
+      SIGNATURE_DOMAIN,
+      Buffer.from(canonicalJson(document.assertion), 'utf8'),
+    ]);
+    return verifyEd25519Profile(
+      Buffer.from(key.public_key, 'base64url'),
+      message,
+      Buffer.from(document.signature, 'base64url'),
+    );
+  } catch {
+    return false;
+  }
 }
 
 function fixturePath(base, relativePath) {
@@ -97,6 +138,9 @@ async function main() {
     if (claims.maximum_event_bytes !== undefined) {
       evidence.maximum_event_bytes = Math.max(...records.map(record => record.length));
     }
+    if (claims.event_byte_lengths !== undefined) {
+      evidence.event_byte_lengths = records.map(record => record.length);
+    }
     if (packagePath !== undefined) {
       evidence.package_input_sha256 = sha256(await readFile(packagePath));
     }
@@ -114,6 +158,10 @@ async function main() {
           && evidence.result !== undefined) {
         evidence.all_event_signatures_valid = evidence.result.recordCount === records.length
           && evidence.result.events.every(event => event.status === 'signature_valid');
+      } else if (claims.signature_evidence === 'independent_ed25519') {
+        evidence.all_event_signatures_valid = records.every(
+          record => independentlyVerifySignature(record, keys),
+        );
       } else {
         evidence.all_event_signatures_valid = records.every(record => {
           try {

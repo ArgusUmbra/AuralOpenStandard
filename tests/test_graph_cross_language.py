@@ -1,3 +1,4 @@
+import base64
 import gzip
 import hashlib
 import json
@@ -5,6 +6,9 @@ from pathlib import Path
 import shutil
 import subprocess
 import unittest
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from aural import provenance
 
@@ -36,9 +40,11 @@ REQUIRED_NEGATIVE_CASE_IDS = frozenset({
     'N12-invalid-ed25519-profile',
 })
 REQUIRED_RESOURCE_CASE_IDS = frozenset({
+    'H-event-bytes-at-limit',
     'H-event-count-4096',
     'H-parent-fanout-64',
     'I-graph-depth-256',
+    'N-event-bytes-over-limit',
     'N-event-count-4097',
     'N13-parent-fanout-65',
     'N14-graph-depth-257',
@@ -135,6 +141,29 @@ def uniform(values):
     if len(distinct) == 1:
         return distinct[0]
     return {'non_uniform_values': distinct}
+
+
+def independently_verify_signature(record, key_records):
+    """Verify a fixture signature without invoking a size-limited event verifier."""
+    try:
+        document = json.loads(record.decode('utf-8'))
+        assertion = document['assertion']
+        signing_key_id = assertion['signing_key_id']
+        key_document = next(
+            json.loads(raw.decode('utf-8')) for raw in key_records
+            if json.loads(raw.decode('utf-8'))['key_id'] == signing_key_id
+        )
+        assertion_bytes = json.dumps(
+            assertion, ensure_ascii=False, separators=(',', ':'), sort_keys=True,
+        ).encode('utf-8')
+        signature = base64.urlsafe_b64decode(document['signature'] + '==')
+        public_key = base64.urlsafe_b64decode(key_document['public_key'] + '=')
+        Ed25519PublicKey.from_public_bytes(public_key).verify(
+            signature, provenance.SIGNATURE_DOMAIN + assertion_bytes,
+        )
+    except (InvalidSignature, KeyError, StopIteration, TypeError, ValueError, UnicodeError):
+        return False
+    return True
 
 
 def normalize_python(result):
@@ -297,6 +326,7 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
             ),
             'aggregate_event_bytes': sum(map(len, records)),
             'maximum_event_bytes': max(map(len, records)),
+            'event_byte_lengths': [len(record) for record in records],
         }
         for name, actual_value in actual_claims.items():
             if name in claims:
@@ -305,7 +335,8 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                     f"{test_case['id']}: input claim {name} differs",
                 )
         if claims.get('all_event_signatures_valid'):
-            if claims.get('signature_evidence') == 'graph_verifier' \
+            signature_evidence = claims.get('signature_evidence')
+            if signature_evidence == 'graph_verifier' \
                     and actual['accepted']:
                 self.assertEqual(len(records), actual['unique_event_count'])
                 self.assertTrue(
@@ -314,18 +345,23 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                     f"{test_case['id']}: graph verification did not validate every signature",
                 )
             elif test_case['id'] not in self._python_signature_claims:
-                all_valid = True
-                for record in records:
-                    try:
-                        result = provenance.verify_signed_event(record, keys)
-                    except provenance.ProvenanceVerificationError:
-                        all_valid = False
-                        break
-                    if result.status != provenance.VerificationStatus.SIGNATURE_VALID:
-                        all_valid = False
-                        break
+                if signature_evidence == 'independent_ed25519':
+                    all_valid = all(
+                        independently_verify_signature(record, keys) for record in records
+                    )
+                else:
+                    all_valid = True
+                    for record in records:
+                        try:
+                            result = provenance.verify_signed_event(record, keys)
+                        except provenance.ProvenanceVerificationError:
+                            all_valid = False
+                            break
+                        if result.status != provenance.VerificationStatus.SIGNATURE_VALID:
+                            all_valid = False
+                            break
                 self._python_signature_claims[test_case['id']] = all_valid
-            if claims.get('signature_evidence') != 'graph_verifier' \
+            if signature_evidence != 'graph_verifier' \
                     or not actual['accepted']:
                 self.assertIs(
                     True, self._python_signature_claims[test_case['id']],
@@ -476,7 +512,8 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                 )
                 for claim_name in (
                         'input_event_count', 'distinct_event_id_count',
-                        'aggregate_event_bytes', 'maximum_event_bytes'):
+                        'aggregate_event_bytes', 'maximum_event_bytes',
+                        'event_byte_lengths'):
                     if claim_name in test_case.get('claims', {}):
                         self.assertEqual(
                             test_case['claims'][claim_name],
