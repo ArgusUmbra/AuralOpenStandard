@@ -21,15 +21,23 @@ class ProvenanceGraphCryptographicTests(unittest.TestCase):
         self.assertEqual(stage, raised.exception.stage)
         return raised.exception
 
-    def test_one_valid_signed_root_reaches_fail_closed_boundary(self):
-        self.assert_error(
-            provenance.ErrorCategory.NOT_IMPLEMENTED,
-            provenance.VerificationStage.GRAPH,
+    def test_one_valid_signed_root_is_consistent_without_package_binding(self):
+        result = provenance.verify_signed_event_graph(
             [self.record('valid-original-acquired.json')],
             [self.record('valid-key.json')],
         )
+        self.assertEqual(provenance.GraphVerificationStatus.CONSISTENT, result.status)
+        self.assertEqual(1, len(result.events))
+        self.assertEqual(
+            provenance.AssetIntegrityStatus.NOT_CHECKED,
+            result.events[0].asset_integrity,
+        )
+        self.assertEqual(provenance.ParentClosureStatus.CLOSED,
+                         result.declared_parent_closure)
+        self.assertEqual(provenance.HistoryCompletenessStatus.NOT_ESTABLISHED,
+                         result.history_completeness)
 
-    def test_multiple_valid_signed_events_reach_fail_closed_boundary(self):
+    def test_multiple_valid_signed_events_are_consistent(self):
         records = [
             self.record('valid-received-with-parent.json'),
             self.record('valid-unknown-optional.json'),
@@ -37,13 +45,14 @@ class ProvenanceGraphCryptographicTests(unittest.TestCase):
         ]
         with mock.patch.object(
                 provenance, 'verify_signed_event', wraps=provenance.verify_signed_event) as verify:
-            self.assert_error(
-                provenance.ErrorCategory.NOT_IMPLEMENTED,
-                provenance.VerificationStage.GRAPH,
+            result = provenance.verify_signed_event_graph(
                 records,
                 [self.record('valid-key.json')],
             )
         self.assertEqual(3, verify.call_count)
+        self.assertEqual(provenance.GraphVerificationStatus.CONSISTENT, result.status)
+        self.assertEqual(3, len(result.events))
+        self.assertEqual(2, result.maximum_depth)
 
     def test_tampered_signature_fails_cryptographic_verification(self):
         self.assert_error(
@@ -89,13 +98,12 @@ class ProvenanceGraphCryptographicTests(unittest.TestCase):
         key = self.record('valid-key.json')
         with mock.patch.object(
                 provenance, 'verify_signed_event', wraps=provenance.verify_signed_event) as verify:
-            self.assert_error(
-                provenance.ErrorCategory.NOT_IMPLEMENTED,
-                provenance.VerificationStage.GRAPH,
-                [record, record, record],
-                [key],
+            result = provenance.verify_signed_event_graph(
+                [record, record, record], [key],
             )
         self.assertEqual(1, verify.call_count)
+        self.assertEqual(1, len(result.events))
+        self.assertEqual(2, result.duplicate_signed_records)
 
     def test_mixed_valid_and_invalid_events_fail_cryptographically(self):
         self.assert_error(
@@ -125,17 +133,13 @@ class ProvenanceGraphCryptographicTests(unittest.TestCase):
             [key],
         )
 
-    def test_package_binding_remains_out_of_scope_and_success_is_fail_closed(self):
-        error = self.assert_error(
-            provenance.ErrorCategory.NOT_IMPLEMENTED,
-            provenance.VerificationStage.GRAPH,
+    def test_requested_package_binding_cannot_be_silently_skipped(self):
+        self.assert_error(
+            provenance.ErrorCategory.PACKAGE_INTEGRITY,
+            provenance.VerificationStage.PACKAGE,
             [self.record('valid-original-acquired.json')],
             [self.record('valid-key.json')],
             package_path=FIXTURES / 'does-not-exist.aural',
-        )
-        self.assertNotEqual(
-            provenance.GraphVerificationStatus.CONSISTENT,
-            getattr(error, 'status', None),
         )
 
 

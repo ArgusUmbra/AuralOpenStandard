@@ -230,27 +230,23 @@ class ProvenanceGraphFoundationTests(unittest.TestCase):
                     )
                     reader.assert_not_called()
 
-    def test_successful_preflight_fails_closed_without_placeholder_success(self):
+    def test_byte_and_file_graph_apis_return_equivalent_success(self):
         fixtures = Path(__file__).parent / 'fixtures' / 'provenance'
         record = (fixtures / 'valid-original-acquired.json').read_bytes()
         key = (fixtures / 'valid-key.json').read_bytes()
-        error = self.assert_error(
-            provenance.ErrorCategory.NOT_IMPLEMENTED,
-            provenance.VerificationStage.GRAPH,
-            lambda: provenance.verify_signed_event_graph([record], [key]),
-        )
-        self.assertIn('not implemented', str(error))
+        byte_result = provenance.verify_signed_event_graph([record], [key])
+        self.assertEqual(provenance.GraphVerificationStatus.CONSISTENT,
+                         byte_result.status)
 
         with tempfile.TemporaryDirectory() as temporary:
             event = Path(temporary) / 'event.json'
             key_path = Path(temporary) / 'key.json'
             event.write_bytes(record)
             key_path.write_bytes(key)
-            self.assert_error(
-                provenance.ErrorCategory.NOT_IMPLEMENTED,
-                provenance.VerificationStage.GRAPH,
-                lambda: provenance.verify_signed_event_graph_files([event], [key_path]),
+            file_result = provenance.verify_signed_event_graph_files(
+                [event], [key_path],
             )
+        self.assertEqual(byte_result, file_result)
 
 
 if __name__ == '__main__':

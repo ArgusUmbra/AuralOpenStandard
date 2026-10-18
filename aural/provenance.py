@@ -4,7 +4,7 @@ import base64
 import binascii
 from collections.abc import Sequence
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from enum import Enum
 from functools import lru_cache
@@ -1318,6 +1318,35 @@ def _resolve_signed_event_graph(index, limits=None):
     return _ResolvedSignedEventGraph(tuple(ordered), maximum_depth)
 
 
+def _verify_package_for_binding(package_path):
+    """Independently verify one Draft 0.2 package for subject binding."""
+    try:
+        return core.verify_detailed(package_path)
+    except core.AuralError as exc:
+        raise ProvenanceVerificationError(
+            ErrorCategory.PACKAGE_INTEGRITY,
+            VerificationStage.PACKAGE,
+            f'AURAL package verification failed: {exc}',
+        ) from exc
+
+
+def _validate_package_binding(assertion, package):
+    """Compare all six signed subject fields with verified package metadata."""
+    subject = assertion['subject']
+    original = subject['original']
+    if (package['format'] != subject['format']
+            or package['version'] != subject['version']
+            or package['manifest_sha256'] != subject['manifest_sha256']
+            or package['original_path'] != original['path']
+            or package['audio_sha256'] != original['sha256']
+            or package['audio_bytes'] != original['byte_length']):
+        _fail(
+            ErrorCategory.SUBJECT_BINDING,
+            VerificationStage.PACKAGE,
+            'signed subject does not match the independently verified AURAL package',
+        )
+
+
 def verify_signed_event(
         record: bytes,
         public_key_records: Sequence[bytes],
@@ -1382,25 +1411,8 @@ def verify_signed_event(
     assertion = validated.assertion
     asset_integrity = AssetIntegrityStatus.NOT_CHECKED
     if package_path is not None:
-        try:
-            package = core.verify_detailed(package_path)
-        except core.AuralError as exc:
-            raise ProvenanceVerificationError(
-                ErrorCategory.PACKAGE_INTEGRITY, VerificationStage.PACKAGE,
-                f'AURAL package verification failed: {exc}',
-            ) from exc
-        subject = assertion['subject']
-        original = subject['original']
-        if (package['format'] != subject['format']
-                or package['version'] != subject['version']
-                or package['manifest_sha256'] != subject['manifest_sha256']
-                or package['original_path'] != original['path']
-                or package['audio_sha256'] != original['sha256']
-                or package['audio_bytes'] != original['byte_length']):
-            _fail(
-                ErrorCategory.SUBJECT_BINDING, VerificationStage.PACKAGE,
-                'signed subject does not match the independently verified AURAL package',
-            )
+        package = _verify_package_for_binding(package_path)
+        _validate_package_binding(assertion, package)
         asset_integrity = AssetIntegrityStatus.VERIFIED
 
     return VerificationResult(
@@ -1474,10 +1486,11 @@ def verify_signed_event_graph(
         package_path: Optional[PathLike] = None,
         limits: Optional[GraphVerificationLimits] = None,
 ) -> GraphVerificationResult:
-    """Verify graph structure and each unique signature; completion is pending.
+    """Verify graph structure, every unique signature, and optional binding.
 
-    Individual-event failures retain their existing categories and stages.  The
-    graph ``package_path`` remains reserved until package binding is integrated.
+    ``CLOSED`` describes only resolution of the supplied parent references.
+    History completeness remains unestablished.  When ``package_path`` is
+    omitted, each event reports that physical package integrity was not checked.
     """
     effective = _graph_limits_or_default(limits)
     _validate_graph_record_inputs(records, effective)
@@ -1513,16 +1526,30 @@ def verify_signed_event_graph(
 
     index = _index_signed_event_records(records, effective)
     resolved = _resolve_signed_event_graph(index, effective)
+    verified_events = []
     for indexed_record in resolved.records:
-        verify_signed_event(
+        verified_events.append(verify_signed_event(
             indexed_record.record,
             public_key_records,
             limits=effective,
-        )
-    raise ProvenanceVerificationError(
-        ErrorCategory.NOT_IMPLEMENTED,
-        VerificationStage.GRAPH,
-        'signed-event graph validation is not implemented',
+        ))
+
+    if package_path is not None:
+        package = _verify_package_for_binding(package_path)
+        for indexed_record in resolved.records:
+            _validate_package_binding(indexed_record.validated.assertion, package)
+        verified_events = [
+            replace(event, asset_integrity=AssetIntegrityStatus.VERIFIED)
+            for event in verified_events
+        ]
+
+    return GraphVerificationResult(
+        status=GraphVerificationStatus.CONSISTENT,
+        events=tuple(verified_events),
+        duplicate_signed_records=index.duplicate_signed_records,
+        maximum_depth=resolved.maximum_depth,
+        declared_parent_closure=ParentClosureStatus.CLOSED,
+        history_completeness=HistoryCompletenessStatus.NOT_ESTABLISHED,
     )
 
 

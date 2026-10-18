@@ -295,14 +295,19 @@ class ProvenanceGraphResolutionTests(unittest.TestCase):
             provenance.VerificationStage.RECORD,
         )
 
-    def test_public_verifier_resolves_then_remains_fail_closed(self):
+    def test_public_verifier_returns_resolved_parent_first_graph(self):
         root = (FIXTURES / 'valid-original-acquired.json').read_bytes()
         child = (FIXTURES / 'valid-received-with-parent.json').read_bytes()
         key = (FIXTURES / 'valid-key.json').read_bytes()
-        self.assert_error(
-            provenance.ErrorCategory.NOT_IMPLEMENTED,
-            lambda: provenance.verify_signed_event_graph([child, root], [key]),
+        result = provenance.verify_signed_event_graph([child, root], [key])
+        self.assertEqual(
+            (
+                'urn:uuid:11111111-2222-4333-8444-555555555555',
+                'urn:uuid:11111111-2222-4333-a444-555555555555',
+            ),
+            tuple(event.event_id for event in result.events),
         )
+        self.assertEqual(2, result.maximum_depth)
 
 
 if __name__ == '__main__':
