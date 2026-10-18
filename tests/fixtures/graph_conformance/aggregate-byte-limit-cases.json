@@ -1,0 +1,42 @@
+{
+  "schema": "org.aural.graph-aggregate-byte-limit-cases",
+  "schema_version": "1",
+  "description": "Deterministic opt-in cases for the aggregate signed-event byte boundary.",
+  "generator": "../../../tools/generate_graph_aggregate_byte_limit_fixture.mjs",
+  "public_key": "../provenance/valid-key.json",
+  "source_sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b",
+  "commitment_scope": "SHA-256 of the raw ordered signed-event record bytes concatenated without separators; a reproducibility check, not source authentication.",
+  "record_layout": {
+    "shared_record_count": 64,
+    "shared_record_bytes": 1040000
+  },
+  "cases": [
+    {
+      "id": "H-aggregate-bytes-at-limit",
+      "record_count": 65,
+      "aggregate_event_bytes": 67108864,
+      "maximum_event_bytes": 1040000,
+      "tail_event_bytes": 548864,
+      "ordered_input_sha256": "c6b90672c8e07a9c69300fea96b76e4a0e3379c1aad4e868deb314fe9f90f0eb",
+      "expected": {
+        "accepted": true
+      }
+    },
+    {
+      "id": "N-aggregate-bytes-over-limit",
+      "record_count": 65,
+      "aggregate_event_bytes": 67108865,
+      "maximum_event_bytes": 1040000,
+      "tail_event_bytes": 548865,
+      "ordered_input_sha256": "39091c5313b8090e8a023af5dd312a6c38baf5702c042e2e95d02383b020db3c",
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "resource_limit",
+          "stage": "input",
+          "message": "aggregate signed-event data exceeds the configured limit"
+        }
+      }
+    }
+  ]
+}
