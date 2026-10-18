@@ -588,20 +588,29 @@ function verifySignedEventGraphInternal(
     return deepFreeze({
       ...publicResult,
       signed_event_sha256: entry.signedEventSha256,
+      declared_parent_count: entry.assertion.parents.length,
     });
   });
 
-  // Assignment 008C-3 has not established the final public graph-success
-  // contract or historical completeness. Package binding below is deliberately
-  // scoped and does not change this incomplete graph outcome.
+  const declaredParentCount = resolved.records.reduce(
+    (total, entry) => total + entry.assertion.parents.length,
+    0,
+  );
+  // Graph aggregates retain the established Node camelCase API. In Python,
+  // recordCount is len(events), duplicateRecordCount is
+  // duplicate_signed_records, maximumDepth is maximum_depth, and
+  // declaredParentClosure is declared_parent_closure. Per-event fields retain
+  // the shared snake_case verification-result contract.
   const graph = deepFreeze({
-    status: 'verification_incomplete',
-    verificationStatus: 'not_implemented',
+    status: 'consistent',
+    verificationStatus: 'consistent',
     parentResolution: 'resolved',
+    declaredParentClosure: 'closed',
     signatureVerification: 'valid',
     packageIntegrity: 'not_checked',
     historyCompleteness: 'not_established',
     recordCount: index.recordCount,
+    declaredParentCount,
     duplicateRecordCount: index.duplicateRecordCount,
     maximumDepth: resolved.maximumDepth,
     eventIds: [...resolved.eventIds],
@@ -614,9 +623,16 @@ function verifySignedEventGraphInternal(
 }
 
 export function verifySignedEventGraph(records, keyRecordRaws, options = {}) {
-  // Preserve the established synchronous result when packagePath is absent.
-  // Safe package-path verification performs asynchronous stable-handle I/O, so
-  // a supplied packagePath produces a Promise for the scoped bound result.
+  // Compatibility entry point: synchronous without packagePath; a supplied
+  // packagePath produces a Promise because archive verification is asynchronous.
+  return verifySignedEventGraphInternal(records, keyRecordRaws, options);
+}
+
+export async function verifySignedEventGraphDetailed(
+  records, keyRecordRaws, options = {},
+) {
+  // The async boundary converts every synchronous preflight failure into a
+  // rejected Promise and adopts the package-verification Promise when present.
   return verifySignedEventGraphInternal(records, keyRecordRaws, options);
 }
 

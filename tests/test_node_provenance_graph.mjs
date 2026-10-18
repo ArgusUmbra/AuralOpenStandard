@@ -19,6 +19,7 @@ import {
   MAX_GRAPH_PARENT_REFERENCES,
   SignedEventGraphIndex,
   verifySignedEventGraph,
+  verifySignedEventGraphDetailed,
 } from '../interop/signed_event_graph.mjs';
 import {
   signedEventSha256,
@@ -344,23 +345,32 @@ test('domain-separated digests agree with Python conformance vectors', async () 
   }
 });
 
-test('cryptographically verifies one genuine signed event but reports an incomplete graph', async () => {
+test('cryptographically verifies one genuine signed root as a consistent supplied graph', async () => {
   const [record, key] = await Promise.all([
     fixture('valid-original-acquired.json'),
     fixture('valid-key.json'),
   ]);
   const result = verifySignedEventGraph([record], [key]);
 
-  assert.equal(result.status, 'verification_incomplete');
-  assert.equal(result.verificationStatus, 'not_implemented');
+  assert.equal(result.status, 'consistent');
+  assert.equal(result.verificationStatus, 'consistent');
   assert.equal(result.parentResolution, 'resolved');
+  assert.equal(result.declaredParentClosure, 'closed');
   assert.equal(result.signatureVerification, 'valid');
   assert.equal(result.packageIntegrity, 'not_checked');
   assert.equal(result.historyCompleteness, 'not_established');
   assert.equal(result.recordCount, 1);
+  assert.equal(result.declaredParentCount, 0);
+  assert.equal(result.duplicateRecordCount, 0);
   assert.equal(result.maximumDepth, 1);
   assert.equal(result.events.length, 1);
   assert.equal(result.events[0].status, 'signature_valid');
+  assert.equal(result.events[0].asset_integrity, 'not_checked');
+  assert.equal(result.events[0].declared_parent_count, 0);
+  assert.equal(result.events[0].investigator_identity, 'not_established');
+  assert.equal(result.events[0].key_trust, 'not_evaluated');
+  assert.equal(result.events[0].time_assurance, 'claimed_only');
+  assert.equal(result.events[0].history_completeness, 'not_established');
   assert.equal(
     result.events[0].signed_event_sha256,
     'e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e',
@@ -380,6 +390,10 @@ test('cryptographically verifies a genuine parent-first multi-event graph', asyn
     'urn:uuid:11111111-2222-4333-a444-555555555555',
   ]);
   assert.deepEqual(result.events.map(event => event.event_id), result.eventIds);
+  assert.equal(result.status, 'consistent');
+  assert.equal(result.recordCount, 2);
+  assert.equal(result.declaredParentCount, 1);
+  assert.deepEqual(result.events.map(event => event.declared_parent_count), [0, 1]);
   assert.equal(result.maximumDepth, 2);
   assert.equal(result.events.every(event => event.status === 'signature_valid'), true);
 });
@@ -559,7 +573,7 @@ test('existing individual-event verifier behavior remains signature-only', async
   );
 });
 
-test('valid graph cryptography never claims package or historical completion', async () => {
+test('consistent graph cryptography never claims package, identity, time, or historical completion', async () => {
   const [record, key] = await Promise.all([
     fixture('valid-original-acquired.json'),
     fixture('valid-key.json'),
@@ -567,11 +581,13 @@ test('valid graph cryptography never claims package or historical completion', a
   const result = verifySignedEventGraph([record], [key]);
   const serialized = JSON.stringify(result);
 
-  assert.equal(result.status, 'verification_incomplete');
-  assert.equal(result.verificationStatus, 'not_implemented');
-  assert.equal(serialized.includes('CONSISTENT'), false);
-  assert.equal(serialized.includes('VERIFIED'), false);
-  assert.equal(serialized.includes('ESTABLISHED'), false);
+  assert.equal(result.status, 'consistent');
+  assert.equal(result.declaredParentClosure, 'closed');
+  assert.equal(result.packageIntegrity, 'not_checked');
+  assert.equal(result.historyCompleteness, 'not_established');
+  assert.equal(result.events[0].investigator_identity, 'not_established');
+  assert.equal(result.events[0].time_assurance, 'claimed_only');
+  assert.equal(serialized.includes('trusted'), false);
 });
 
 test('matching package binds one signed event on all six exact subject fields', async () => {
@@ -603,8 +619,9 @@ test('matching package binds one signed event on all six exact subject fields', 
   const result = await verifySignedEventGraph(
     [record], [key], { packagePath: MATCHING_PACKAGE },
   );
-  assert.equal(result.status, 'verification_incomplete');
-  assert.equal(result.verificationStatus, 'not_implemented');
+  assert.equal(result.status, 'consistent');
+  assert.equal(result.verificationStatus, 'consistent');
+  assert.equal(result.declaredParentClosure, 'closed');
   assert.equal(result.signatureVerification, 'valid');
   assert.equal(result.packageIntegrity, 'verified');
   assert.equal(result.subjectBinding, 'verified');
@@ -625,6 +642,7 @@ test('matching package binds every unique event in a signed multi-event graph', 
   );
 
   assert.equal(result.recordCount, 2);
+  assert.equal(result.declaredParentCount, 1);
   assert.equal(result.packageIntegrity, 'verified');
   assert.equal(result.subjectBinding, 'verified');
   assert.equal(result.events.every(event => event.asset_integrity === 'verified'), true);
@@ -648,6 +666,7 @@ test('matching package is verified once and duplicate events bind once logically
 
   assert.equal(calls, 1);
   assert.equal(result.recordCount, 1);
+  assert.equal(result.declaredParentCount, 0);
   assert.equal(result.duplicateRecordCount, 2);
   assert.equal(result.events.length, 1);
   assert.equal(result.events[0].asset_integrity, 'verified');
@@ -668,6 +687,147 @@ test('no-package behavior remains synchronous and package integrity is not check
   assert.equal(result.packageIntegrity, 'not_checked');
   assert.equal('subjectBinding' in result, false);
   assert.equal(result.events[0].asset_integrity, 'not_checked');
+});
+
+test('detailed graph verification always returns a Promise', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+
+  const withoutPackage = verifySignedEventGraphDetailed([record], [key]);
+  assert.equal(withoutPackage instanceof Promise, true);
+  assert.equal((await withoutPackage).status, 'consistent');
+
+  const withPackage = verifySignedEventGraphDetailed(
+    [record], [key], { packagePath: MATCHING_PACKAGE },
+  );
+  assert.equal(withPackage instanceof Promise, true);
+  assert.equal((await withPackage).packageIntegrity, 'verified');
+});
+
+test('detailed graph verification rejects early record, graph, and signature failures asynchronously', async () => {
+  const [noncanonical, missingParent, invalidSignature, key] = await Promise.all([
+    fixture('invalid-noncanonical.json'),
+    fixture('valid-received-with-parent.json'),
+    fixture('invalid-signature.json'),
+    fixture('valid-key.json'),
+  ]);
+
+  let malformedPromise;
+  assert.doesNotThrow(() => {
+    malformedPromise = verifySignedEventGraphDetailed([noncanonical], [key]);
+  });
+  assert.equal(malformedPromise instanceof Promise, true);
+  await assert.rejects(malformedPromise, expectError('canonicalization', 'record'));
+
+  let graphPromise;
+  assert.doesNotThrow(() => {
+    graphPromise = verifySignedEventGraphDetailed([missingParent], [key]);
+  });
+  assert.equal(graphPromise instanceof Promise, true);
+  await assert.rejects(graphPromise, expectError('missing_parent', 'graph'));
+
+  let signaturePromise;
+  assert.doesNotThrow(() => {
+    signaturePromise = verifySignedEventGraphDetailed([invalidSignature], [key]);
+  });
+  assert.equal(signaturePromise instanceof Promise, true);
+  await assert.rejects(signaturePromise, expectError('signature', 'signature'));
+});
+
+test('detailed graph verification rejects invalid inputs and limits asynchronously', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  const cases = [
+    [() => verifySignedEventGraphDetailed(null, [key]), 'input'],
+    [() => verifySignedEventGraphDetailed([record], null), 'input'],
+    [() => verifySignedEventGraphDetailed([record], [key], null), 'configuration'],
+    [() => verifySignedEventGraphDetailed(
+      [record], [key], { maxGraphDepth: MAX_GRAPH_DEPTH + 1 },
+    ), 'configuration'],
+    [() => verifySignedEventGraphDetailed(
+      [record], [key], { packageMetadata: {} },
+    ), 'configuration'],
+  ];
+
+  for (const [invoke, category] of cases) {
+    let promise;
+    assert.doesNotThrow(() => { promise = invoke(); });
+    assert.equal(promise instanceof Promise, true);
+    await assert.rejects(promise, expectError(category, 'input'));
+  }
+});
+
+test('detailed graph verification rejects late archive and binding failures', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+  const failures = [
+    [join(PACKAGE_FIXTURES, 'does-not-exist.aural'), 'package_integrity'],
+    [join(PACKAGE_FIXTURES, 'invalid-malformed-json.aural'), 'package_integrity'],
+    [join(PACKAGE_FIXTURES, 'valid-minimal.aural'), 'subject_binding'],
+  ];
+
+  for (const [packagePath, category] of failures) {
+    let result;
+    const promise = verifySignedEventGraphDetailed(
+      [record], [key], { packagePath },
+    ).then(value => { result = value; return value; });
+    assert.equal(promise instanceof Promise, true);
+    await assert.rejects(promise, expectError(category, 'package'));
+    assert.equal(result, undefined, 'a failed operation must not expose a consistent result');
+  }
+});
+
+test('complete graph results are independent of valid input ordering', async () => {
+  const [root, independent, child, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-unknown-optional.json'),
+    fixture('valid-received-with-parent.json'),
+    fixture('valid-key.json'),
+  ]);
+  const inputs = [root, independent, child, root];
+  const reordered = [child, root, root, independent];
+
+  const withoutPackage = await Promise.all([
+    verifySignedEventGraphDetailed(inputs, [key]),
+    verifySignedEventGraphDetailed(reordered, [key]),
+  ]);
+  assert.deepEqual(withoutPackage[1], withoutPackage[0]);
+  assert.equal(withoutPackage[0].recordCount, 3);
+  assert.equal(withoutPackage[0].declaredParentCount, 1);
+  assert.equal(withoutPackage[0].duplicateRecordCount, 1);
+
+  const withPackage = await Promise.all([
+    verifySignedEventGraphDetailed(inputs, [key], { packagePath: MATCHING_PACKAGE }),
+    verifySignedEventGraphDetailed(reordered, [key], { packagePath: MATCHING_PACKAGE }),
+  ]);
+  assert.deepEqual(withPackage[1], withPackage[0]);
+  assert.equal(withPackage[0].packageIntegrity, 'verified');
+  assert.equal(withPackage[0].events.every(
+    event => event.asset_integrity === 'verified' && event.status === 'signature_valid',
+  ), true);
+});
+
+test('compatibility graph verification retains its established return patterns', async () => {
+  const [record, key] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('valid-key.json'),
+  ]);
+
+  const synchronous = verifySignedEventGraph([record], [key]);
+  assert.equal(synchronous instanceof Promise, false);
+  assert.equal(synchronous.status, 'consistent');
+
+  const asynchronous = verifySignedEventGraph(
+    [record], [key], { packagePath: MATCHING_PACKAGE },
+  );
+  assert.equal(asynchronous instanceof Promise, true);
+  assert.equal((await asynchronous).status, 'consistent');
 });
 
 test('an unrelated valid package fails subject binding', async () => {
