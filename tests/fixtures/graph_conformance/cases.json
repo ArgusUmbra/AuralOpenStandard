@@ -64,6 +64,10 @@
     }
   },
   "bundles": {
+    "graph_event_counts": {
+      "path": "graph-event-count-cases.json.gz",
+      "sha256": "a5f3f3bc2dccdfec7dadc7cc8fafeecb88f7989f1a0791bb8f803b433aa49415"
+    },
     "graph_resources": {
       "path": "graph-resource-cases.json.gz",
       "sha256": "502b62a1d48c23fb158db53efc39e5838b72863dae13079a7f7610b49c58f0eb"
@@ -274,6 +278,36 @@
       }
     },
     {
+      "id": "H-event-count-4096",
+      "purpose": "Exactly 4,096 distinct genuinely signed independent roots are accepted at the graph event-count boundary.",
+      "resource_bundle": {
+        "bundle": "graph_event_counts",
+        "collection": "event_count_roots",
+        "record_count": 4096
+      },
+      "public_keys": ["test_key"],
+      "claims": {
+        "all_event_signatures_valid": true,
+        "signature_evidence": "graph_verifier",
+        "input_event_count": 4096,
+        "distinct_event_id_count": 4096,
+        "aggregate_event_bytes": 5918720,
+        "maximum_event_bytes": 1445
+      },
+      "expected": {
+        "accepted": true,
+        "status": "consistent",
+        "declared_parent_closure": "closed",
+        "history_completeness": "not_established",
+        "package_integrity": "not_checked",
+        "unique_event_count": 4096,
+        "duplicate_input_count": 0,
+        "declared_parent_count": 0,
+        "maximum_depth": 1,
+        "ordered_event_source": "resource_bundle_order"
+      }
+    },
+    {
       "id": "N01-invalid-ed25519-signature",
       "purpose": "A structurally valid canonical event is rejected when its Ed25519 signature is invalid.",
       "signed_events": ["invalid_signature"],
@@ -468,6 +502,30 @@
         "error": {
           "category": "resource_limit",
           "stage": "graph"
+        }
+      }
+    },
+    {
+      "id": "N-event-count-4097",
+      "purpose": "The same 4,096 independent roots plus one additional distinct genuinely signed root are rejected at the graph event-count boundary.",
+      "resource_bundle": {
+        "bundle": "graph_event_counts",
+        "collection": "event_count_roots",
+        "record_count": 4097
+      },
+      "public_keys": ["test_key"],
+      "claims": {
+        "all_event_signatures_valid": true,
+        "input_event_count": 4097,
+        "distinct_event_id_count": 4097,
+        "aggregate_event_bytes": 5920165,
+        "maximum_event_bytes": 1445
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "resource_limit",
+          "stage": "input"
         }
       }
     },

@@ -54,7 +54,16 @@ async function main() {
       if (!Array.isArray(encoded)) {
         throw new Error(`${testCase.id}: resource bundle collection must be an array`);
       }
-      records = encoded.map(record => Buffer.from(record, 'utf8'));
+      let selected = encoded;
+      if (selection.record_count !== undefined) {
+        if (!Number.isSafeInteger(selection.record_count)
+            || selection.record_count < 1
+            || selection.record_count > encoded.length) {
+          throw new Error(`${testCase.id}: invalid resource bundle record count`);
+        }
+        selected = encoded.slice(0, selection.record_count);
+      }
+      records = selected.map(record => Buffer.from(record, 'utf8'));
     } else {
       const eventPaths = testCase.signed_events.map(
         alias => fixturePath(base, manifest.events[alias].path),
@@ -71,17 +80,25 @@ async function main() {
       event_input_sha256: records.map(sha256),
       key_input_sha256: keys.map(sha256),
     };
+    const claims = testCase.claims ?? {};
+    if (claims.input_event_count !== undefined) {
+      evidence.input_event_count = records.length;
+    }
+    if (claims.distinct_event_id_count !== undefined) {
+      evidence.distinct_event_id_count = new Set(records.map(
+        record => JSON.parse(record.toString('utf8')).assertion.event_id,
+      )).size;
+    }
+    if (claims.aggregate_event_bytes !== undefined) {
+      evidence.aggregate_event_bytes = records.reduce(
+        (total, record) => total + record.length, 0,
+      );
+    }
+    if (claims.maximum_event_bytes !== undefined) {
+      evidence.maximum_event_bytes = Math.max(...records.map(record => record.length));
+    }
     if (packagePath !== undefined) {
       evidence.package_input_sha256 = sha256(await readFile(packagePath));
-    }
-    if (testCase.claims?.all_event_signatures_valid === true) {
-      evidence.all_event_signatures_valid = records.every(record => {
-        try {
-          return verifySignedEvent(record, keys).status === 'signature_valid';
-        } catch {
-          return false;
-        }
-      });
     }
     try {
       evidence.result = await verifySignedEventGraphDetailed(records, keys, options);
@@ -91,6 +108,21 @@ async function main() {
         stage: error?.stage ?? 'internal',
         message: error?.message ?? String(error),
       };
+    }
+    if (claims.all_event_signatures_valid === true) {
+      if (claims.signature_evidence === 'graph_verifier'
+          && evidence.result !== undefined) {
+        evidence.all_event_signatures_valid = evidence.result.recordCount === records.length
+          && evidence.result.events.every(event => event.status === 'signature_valid');
+      } else {
+        evidence.all_event_signatures_valid = records.every(record => {
+          try {
+            return verifySignedEvent(record, keys).status === 'signature_valid';
+          } catch {
+            return false;
+          }
+        });
+      }
     }
     cases[testCase.id] = evidence;
   }

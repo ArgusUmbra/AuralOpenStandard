@@ -36,8 +36,10 @@ REQUIRED_NEGATIVE_CASE_IDS = frozenset({
     'N12-invalid-ed25519-profile',
 })
 REQUIRED_RESOURCE_CASE_IDS = frozenset({
+    'H-event-count-4096',
     'H-parent-fanout-64',
     'I-graph-depth-256',
+    'N-event-count-4097',
     'N13-parent-fanout-65',
     'N14-graph-depth-257',
     'N15-competing-malformed-forward',
@@ -189,6 +191,8 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         cls.cases = cls.manifest.get('cases')
         validate_case_inventory(cls.cases)
         cls.events = cls.manifest['events']
+        cls._python_case_results = {}
+        cls._python_signature_claims = {}
         cls.bundles = {}
         for alias, fixture in cls.manifest.get('bundles', {}).items():
             relative = Path(fixture['path'])
@@ -220,6 +224,12 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
             bundle = self.bundles[selection['bundle']]
             encoded = bundle['collections'][selection['collection']]
             self.assertIsInstance(encoded, list)
+            if 'record_count' in selection:
+                record_count = selection['record_count']
+                self.assertIs(type(record_count), int)
+                self.assertGreater(record_count, 0)
+                self.assertLessEqual(record_count, len(encoded))
+                encoded = encoded[:record_count]
             records = [record.encode('utf-8') for record in encoded]
         else:
             records = [
@@ -275,18 +285,57 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         } for fixture in fixtures]
         return expected
 
-    def assert_python_case_claims(self, test_case, records, keys):
+    def assert_python_case_claims(self, test_case, records, keys, actual):
         claims = test_case.get('claims', {})
-        if claims.get('all_event_signatures_valid'):
-            for index, record in enumerate(records):
-                result = provenance.verify_signed_event(record, keys)
+        event_ids = None
+        if 'distinct_event_id_count' in claims:
+            event_ids = [json.loads(record)['assertion']['event_id'] for record in records]
+        actual_claims = {
+            'input_event_count': len(records),
+            'distinct_event_id_count': (
+                None if event_ids is None else len(set(event_ids))
+            ),
+            'aggregate_event_bytes': sum(map(len, records)),
+            'maximum_event_bytes': max(map(len, records)),
+        }
+        for name, actual_value in actual_claims.items():
+            if name in claims:
                 self.assertEqual(
-                    provenance.VerificationStatus.SIGNATURE_VALID,
-                    result.status,
-                    f"{test_case['id']}: record {index} is not genuinely signed",
+                    claims[name], actual_value,
+                    f"{test_case['id']}: input claim {name} differs",
+                )
+        if claims.get('all_event_signatures_valid'):
+            if claims.get('signature_evidence') == 'graph_verifier' \
+                    and actual['accepted']:
+                self.assertEqual(len(records), actual['unique_event_count'])
+                self.assertTrue(
+                    all(event['signature_verification'] == 'signature_valid'
+                        for event in actual['events']),
+                    f"{test_case['id']}: graph verification did not validate every signature",
+                )
+            elif test_case['id'] not in self._python_signature_claims:
+                all_valid = True
+                for record in records:
+                    try:
+                        result = provenance.verify_signed_event(record, keys)
+                    except provenance.ProvenanceVerificationError:
+                        all_valid = False
+                        break
+                    if result.status != provenance.VerificationStatus.SIGNATURE_VALID:
+                        all_valid = False
+                        break
+                self._python_signature_claims[test_case['id']] = all_valid
+            if claims.get('signature_evidence') != 'graph_verifier' \
+                    or not actual['accepted']:
+                self.assertIs(
+                    True, self._python_signature_claims[test_case['id']],
+                    f"{test_case['id']}: a rejected fixture record is not genuinely signed",
                 )
 
     def verify_python(self, test_case):
+        cached = self._python_case_results.get(test_case['id'])
+        if cached is not None:
+            return cached
         records, keys, package, package_sha256 = self.case_inputs(test_case)
         try:
             result = provenance.verify_signed_event_graph(
@@ -302,7 +351,9 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
             }
         else:
             normalized = normalize_python(result)
-        return records, keys, package_sha256, normalized
+        cached = records, keys, package_sha256, normalized
+        self._python_case_results[test_case['id']] = cached
+        return cached
 
     def mismatch_lines(self, case_id, python_result, node_result, expected):
         lines = []
@@ -386,7 +437,7 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         for test_case in self.cases:
             with self.subTest(case=test_case['id']):
                 records, keys, _package_sha256, actual = self.verify_python(test_case)
-                self.assert_python_case_claims(test_case, records, keys)
+                self.assert_python_case_claims(test_case, records, keys, actual)
                 expected = self.expected_result(test_case)
                 diagnostics = self.mismatch_lines(
                     test_case['id'], actual, actual, expected,
@@ -420,7 +471,18 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
             with self.subTest(case=case_id):
                 records, keys, package_sha256, python_result = self.verify_python(test_case)
                 node_case = payload['cases'][case_id]
-                self.assert_python_case_claims(test_case, records, keys)
+                self.assert_python_case_claims(
+                    test_case, records, keys, python_result,
+                )
+                for claim_name in (
+                        'input_event_count', 'distinct_event_id_count',
+                        'aggregate_event_bytes', 'maximum_event_bytes'):
+                    if claim_name in test_case.get('claims', {}):
+                        self.assertEqual(
+                            test_case['claims'][claim_name],
+                            node_case.get(claim_name),
+                            f'{case_id}: Node input claim {claim_name} differs',
+                        )
                 if test_case.get('claims', {}).get('all_event_signatures_valid'):
                     self.assertIs(
                         True, node_case.get('all_event_signatures_valid'),
