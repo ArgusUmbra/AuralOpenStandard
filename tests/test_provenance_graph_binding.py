@@ -22,6 +22,29 @@ class ProvenanceGraphBindingTests(unittest.TestCase):
         self.assertEqual(provenance.VerificationStage.PACKAGE,
                          raised.exception.stage)
 
+    def test_no_package_leaves_integrity_unchecked_without_verification(self):
+        records = [
+            self.record('valid-received-with-parent.json'),
+            self.record('valid-unknown-optional.json'),
+            self.record('valid-original-acquired.json'),
+        ]
+        key = self.record('valid-key.json')
+        with mock.patch.object(
+                provenance.core, 'verify_detailed',
+                wraps=provenance.core.verify_detailed) as package_verify:
+            result = provenance.verify_signed_event_graph(records, [key])
+
+        package_verify.assert_not_called()
+        self.assertEqual(provenance.GraphVerificationStatus.CONSISTENT, result.status)
+        self.assertEqual(provenance.ParentClosureStatus.CLOSED,
+                         result.declared_parent_closure)
+        self.assertTrue(all(
+            event.asset_integrity is provenance.AssetIntegrityStatus.NOT_CHECKED
+            for event in result.events
+        ))
+        self.assertEqual(provenance.HistoryCompletenessStatus.NOT_ESTABLISHED,
+                         result.history_completeness)
+
     def test_matching_package_is_verified_once_and_bound_to_every_event(self):
         records = [
             self.record('valid-received-with-parent.json'),
@@ -41,10 +64,14 @@ class ProvenanceGraphBindingTests(unittest.TestCase):
         self.assertEqual(1, package_verify.call_count)
         self.assertEqual(3, bind.call_count)
         self.assertEqual(provenance.GraphVerificationStatus.CONSISTENT, result.status)
+        self.assertEqual(provenance.ParentClosureStatus.CLOSED,
+                         result.declared_parent_closure)
         self.assertTrue(all(
             event.asset_integrity is provenance.AssetIntegrityStatus.VERIFIED
             for event in result.events
         ))
+        self.assertEqual(provenance.HistoryCompletenessStatus.NOT_ESTABLISHED,
+                         result.history_completeness)
 
     def test_disconnected_signed_graph_is_consistent_and_deterministic(self):
         records = [
