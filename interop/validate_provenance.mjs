@@ -393,6 +393,25 @@ function validateAssertion(assertion) {
   validateClaims(assertion.claims, assertion.signing_key_id);
 }
 
+export function validateSignedEventRecord(recordRaw, options = {}) {
+  const maximum = Number.isSafeInteger(options.maxRecord) && options.maxRecord >= 0
+    ? Math.min(options.maxRecord, MAX_RECORD) : MAX_RECORD;
+  const record = parseCanonical(recordRaw, 'signed-event record', maximum);
+  if (!exactKeys(record, ['assertion', 'signature'])) {
+    fail('schema', 'signed-event envelope must contain exactly assertion and signature');
+  }
+  validateAssertion(record.assertion);
+  canonicalBase64url(record.signature, 64, 'signature');
+  return record;
+}
+
+export function signedEventSha256(recordRaw) {
+  if (!Buffer.isBuffer(recordRaw)) {
+    fail('input', 'signed-event record must be supplied as bytes');
+  }
+  return createHash('sha256').update(RECORD_DOMAIN).update(recordRaw).digest('hex');
+}
+
 export function verifySignedEvent(recordRaw, keyRecordRaws, options = {}) {
   const maximum = Number.isSafeInteger(options.maxRecord) && options.maxRecord >= 0
     ? Math.min(options.maxRecord, MAX_RECORD) : MAX_RECORD;
@@ -423,7 +442,7 @@ export function verifySignedEvent(recordRaw, keyRecordRaws, options = {}) {
   const assertionBytes = Buffer.from(canonical(record.assertion), 'utf8');
   const signatureInput = Buffer.concat([DOMAIN, assertionBytes]);
   verifyEd25519ProfileOrFail(key.publicKey, signatureInput, signature);
-  const signedEventDigest = createHash('sha256').update(RECORD_DOMAIN).update(recordRaw).digest('hex');
+  const signedEventDigest = signedEventSha256(recordRaw);
   return {
     status: 'signature_valid',
     event_id: record.assertion.event_id,
