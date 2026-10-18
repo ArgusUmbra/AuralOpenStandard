@@ -33,13 +33,18 @@ async function main() {
     );
     const records = await Promise.all(eventPaths.map(path => readFile(path)));
     const keys = await Promise.all(keyPaths.map(path => readFile(path)));
-    const options = testCase.package === undefined ? {} : {
-      packagePath: fixturePath(base, manifest.packages[testCase.package]),
-    };
+    const packageFixture = testCase.package === undefined
+      ? undefined : manifest.packages[testCase.package];
+    const packagePath = packageFixture === undefined
+      ? undefined : fixturePath(base, packageFixture.path);
+    const options = packagePath === undefined ? {} : { packagePath };
     const evidence = {
       event_input_sha256: records.map(sha256),
       key_input_sha256: keys.map(sha256),
     };
+    if (packagePath !== undefined) {
+      evidence.package_input_sha256 = sha256(await readFile(packagePath));
+    }
     try {
       evidence.result = await verifySignedEventGraphDetailed(records, keys, options);
     } catch (error) {

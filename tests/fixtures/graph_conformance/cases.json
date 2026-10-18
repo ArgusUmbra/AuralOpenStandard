@@ -58,8 +58,26 @@
     "test_key": "../provenance/valid-key.json"
   },
   "packages": {
-    "matching": "../conformance/valid-unicode.aural",
-    "unrelated": "../conformance/valid-independent.aural"
+    "matching": {
+      "path": "../conformance/valid-unicode.aural",
+      "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+    },
+    "unrelated": {
+      "path": "../conformance/valid-independent.aural",
+      "sha256": "66968f5b917d972797cac9a4b6600e3c6743600653cb8183536ee77b7a666a2b"
+    },
+    "corrupted_original_audio": {
+      "path": "../conformance/invalid-altered-original.aural",
+      "sha256": "beeaaf62836cdbd8eae08ec97d2ea4d990aa245475d1919de2faa6ed05500ae6"
+    },
+    "invalid_manifest": {
+      "path": "../conformance/invalid-malformed-json.aural",
+      "sha256": "769e17135887991505f32879222dcd838b44f1246da498044e18a6dace7f8c0a"
+    },
+    "invalid_zip_structure": {
+      "path": "../conformance/invalid-malformed-local-header.aural",
+      "sha256": "a00ab5632514ac461b94dc857efcc07c57e2ba09dea5e208d9ebf6f1db0823e2"
+    }
   },
   "cases": [
     {
@@ -239,6 +257,48 @@
         "accepted": false,
         "error": {
           "category": "subject_binding",
+          "stage": "package"
+        }
+      }
+    },
+    {
+      "id": "N05-corrupted-original-audio",
+      "purpose": "A genuine signed root is rejected during independent archive verification when the original WAV bytes do not match the manifest integrity value.",
+      "signed_events": ["root"],
+      "public_keys": ["test_key"],
+      "package": "corrupted_original_audio",
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "package_integrity",
+          "stage": "package"
+        }
+      }
+    },
+    {
+      "id": "N06-invalid-manifest",
+      "purpose": "A genuine signed root is rejected during independent archive verification when the ZIP opens but manifest.json is malformed JSON.",
+      "signed_events": ["root"],
+      "public_keys": ["test_key"],
+      "package": "invalid_manifest",
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "package_integrity",
+          "stage": "package"
+        }
+      }
+    },
+    {
+      "id": "N07-invalid-zip-structure",
+      "purpose": "A genuine signed root is rejected during independent archive verification when the ZIP local file header signature is malformed.",
+      "signed_events": ["root"],
+      "public_keys": ["test_key"],
+      "package": "invalid_zip_structure",
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "package_integrity",
           "stage": "package"
         }
       }

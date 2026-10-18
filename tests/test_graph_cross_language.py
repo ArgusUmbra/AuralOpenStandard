@@ -25,6 +25,9 @@ REQUIRED_NEGATIVE_CASE_IDS = frozenset({
     'N02-missing-declared-parent',
     'N03-parent-digest-mismatch',
     'N04-unrelated-valid-package',
+    'N05-corrupted-original-audio',
+    'N06-invalid-manifest',
+    'N07-invalid-zip-structure',
 })
 REQUIRED_CASE_IDS = REQUIRED_POSITIVE_CASE_IDS | REQUIRED_NEGATIVE_CASE_IDS
 
@@ -186,11 +189,16 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
             for alias in test_case['public_keys']
         ]
         package = None
+        package_sha256 = None
         if 'package' in test_case:
-            package = self.fixture_path(
-                self.manifest['packages'][test_case['package']],
+            package_fixture = self.manifest['packages'][test_case['package']]
+            package = self.fixture_path(package_fixture['path'])
+            package_sha256 = hashlib.sha256(package.read_bytes()).hexdigest()
+            self.assertEqual(
+                package_fixture['sha256'], package_sha256,
+                f"{test_case['id']}: package fixture SHA-256 does not match manifest pin",
             )
-        return records, keys, package
+        return records, keys, package, package_sha256
 
     def expected_result(self, test_case):
         expected = dict(test_case['expected'])
@@ -211,7 +219,7 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         return expected
 
     def verify_python(self, test_case):
-        records, keys, package = self.case_inputs(test_case)
+        records, keys, package, package_sha256 = self.case_inputs(test_case)
         try:
             result = provenance.verify_signed_event_graph(
                 records, keys, package_path=package,
@@ -226,7 +234,7 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
             }
         else:
             normalized = normalize_python(result)
-        return records, keys, normalized
+        return records, keys, package_sha256, normalized
 
     def mismatch_lines(self, case_id, python_result, node_result, expected):
         lines = []
@@ -309,7 +317,7 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
     def test_python_results_match_independent_expectations(self):
         for test_case in self.cases:
             with self.subTest(case=test_case['id']):
-                _records, _keys, actual = self.verify_python(test_case)
+                _records, _keys, _package_sha256, actual = self.verify_python(test_case)
                 expected = self.expected_result(test_case)
                 diagnostics = self.mismatch_lines(
                     test_case['id'], actual, actual, expected,
@@ -341,7 +349,7 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         for test_case in self.cases:
             case_id = test_case['id']
             with self.subTest(case=case_id):
-                records, keys, python_result = self.verify_python(test_case)
+                records, keys, package_sha256, python_result = self.verify_python(test_case)
                 node_case = payload['cases'][case_id]
                 self.assertEqual(
                     [hashlib.sha256(raw).hexdigest() for raw in records],
@@ -353,6 +361,13 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                     node_case['key_input_sha256'],
                     f'{case_id}: verifier public-key input bytes differ',
                 )
+                if package_sha256 is None:
+                    self.assertNotIn('package_input_sha256', node_case)
+                else:
+                    self.assertEqual(
+                        package_sha256, node_case.get('package_input_sha256'),
+                        f'{case_id}: verifier package input bytes differ',
+                    )
                 if 'error' in node_case:
                     node_result = {
                         'accepted': False,
