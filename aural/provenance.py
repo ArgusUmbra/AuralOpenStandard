@@ -1613,10 +1613,10 @@ def verify_signed_event_graph_files(
             'too many public-key records',
         )
 
-    with ExitStack() as stack:
-        events = []
-        aggregate = 0
-        for index, path in enumerate(event_paths):
+    record_raws = []
+    aggregate = 0
+    for index, path in enumerate(event_paths):
+        with ExitStack() as stack:
             event = _open_preflighted_file(
                 stack, path, effective.event_bytes,
                 f'signed-event record {index}',
@@ -1628,11 +1628,12 @@ def verify_signed_event_graph_files(
                     VerificationStage.INPUT,
                     'aggregate signed-event data exceeds the configured limit',
                 )
-            events.append(event)
+            record_raws.append(_read_preflighted_file(event))
 
-        keys = []
-        aggregate = 0
-        for path in key_paths:
+    key_record_raws = []
+    aggregate = 0
+    for path in key_paths:
+        with ExitStack() as stack:
             key = _open_preflighted_file(
                 stack, path, effective.key_record_bytes, 'public-key record',
             )
@@ -1643,10 +1644,7 @@ def verify_signed_event_graph_files(
                     VerificationStage.INPUT,
                     'aggregate public-key data exceeds the configured limit',
                 )
-            keys.append(key)
-
-        record_raws = [_read_preflighted_file(event) for event in events]
-        key_record_raws = [_read_preflighted_file(key) for key in keys]
+            key_record_raws.append(_read_preflighted_file(key))
 
     return verify_signed_event_graph(
         record_raws,
