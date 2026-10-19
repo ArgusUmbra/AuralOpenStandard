@@ -129,7 +129,10 @@ class GraphAggregateGeneratorSafetyTests(unittest.TestCase):
                     'output directory parent',
                 )
             finally:
-                redirect.rmdir()
+                if redirect.is_symlink():
+                    redirect.unlink()
+                else:
+                    redirect.rmdir()
 
     def test_accepts_fresh_temporary_destination_without_large_generation(self):
         with tempfile.TemporaryDirectory(prefix='aural-generator-parent-') as parent:
