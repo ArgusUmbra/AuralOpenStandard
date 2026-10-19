@@ -16,6 +16,160 @@ For each provenance case, consume `inputs` in ascending `order`. The roles are `
 
 The provenance profile `org.aural.signature.ed25519-jcs-v1` and the signed-event graph profile remain experimental. The Core Reader manifest covers a bounded public subset and does not include every dynamic, large-boundary, writer, provenance, or graph test.
 
+## Core Reader executable runner
+
+The portable interface is [AURAL Conformance Adapter Protocol 1](CONFORMANCE-ADAPTER-PROTOCOL-1-EXPERIMENTAL.md). It is a versioned JSON-over-child-process contract that any language can implement. `tools/run_aural_conformance.py` is an optional Python 3.11 standard-library convenience runner for that contract; Python is not a requirement for the implementation being tested.
+
+Before running cases, verify the three published manifests and all referenced input bytes:
+
+```text
+python tools/validate_core_conformance_manifest.py
+python tools/validate_provenance_conformance_manifest.py
+python tools/validate_graph_conformance_manifest.py
+```
+
+Each validator performs strict JSON and inventory checks, confines fixture paths, and verifies exact sizes and streaming SHA-256 digests. A non-Python consumer can implement the same public checks from the manifests. The Core Reader runner repeats the Core manifest and fixture validation before it starts any adapter.
+
+### Implement an adapter in any language
+
+An adapter reads one request from standard input, invokes the implementation under test on `input.path`, writes one response to standard output, and exits. The runner creates a new process for every case and never supplies `expected.outcome` to it. Logs go to standard error.
+
+Request shape:
+
+```json
+{
+  "protocol": "org.aural.conformance.adapter",
+  "protocol_version": 1,
+  "case_id": "aural-core-reader/0.2-draft/valid-minimal",
+  "operation": "verify-package",
+  "input": {
+    "role": "package",
+    "path": "/local/checkout/tests/fixtures/conformance/valid-minimal.aural",
+    "size": 549,
+    "sha256": "aae82053118bedd4ab55c32322aeab7219ac2f4fced5847eee6d07215feda6a3"
+  }
+}
+```
+
+Response shape:
+
+```json
+{
+  "protocol": "org.aural.conformance.adapter",
+  "protocol_version": 1,
+  "case_id": "aural-core-reader/0.2-draft/valid-minimal",
+  "outcome": "accept",
+  "implementation": {
+    "name": "Example Core Reader",
+    "version": "1.4.0"
+  }
+}
+```
+
+The implementation result is exactly `accept` or `reject`. A controlled invalid-package exception should become `reject` with process exit zero. An unexpected exception, crash, unsupported operation, or inability to execute should produce a nonzero exit and no response; it is an execution error, not a rejection. Strict parsing, exact fields, duplicate-name rejection, byte limits, mismatch behavior, and extension rules are specified in the protocol document. A Rust, C++, or other native adapter needs only standard input/output, UTF-8 JSON support, and its implementation's normal verification entry point.
+
+### Run Core Reader 0.2
+
+The runner passes the executable and each repeated argument directly to `subprocess` with no shell. Quote paths for the shell from which you start the runner; they remain one argument when the adapter process is created.
+
+```text
+python tools/run_aural_conformance.py \
+  --profile core-reader-0.2 \
+  --report core-reader-report.json \
+  --timeout 10 \
+  --adapter /opt/example/bin/aural-adapter \
+  --adapter-arg=--strict
+```
+
+PowerShell example with a spaced executable path:
+
+```powershell
+python tools/run_aural_conformance.py `
+  --profile core-reader-0.2 `
+  --report core-reader-report.json `
+  --adapter "C:\Program Files\Example\aural-adapter.exe" `
+  --adapter-arg=--strict
+```
+
+Use `--adapter-arg` once per argument. The `--adapter-arg=--flag` form is required when an adapter argument starts with a hyphen. Other options are `--manifest PATH` for a separately obtained copy of the published Core manifest, `--include-legacy` for both optional Draft 0.1 cases, `--timeout SECONDS` from 0.05 through 60, and repeatable `--skip-case CASE_ID` for an explicit development-time skip. Skipping any required case makes coverage incomplete.
+
+The repository includes a smoke-test bridge:
+
+```text
+python tools/run_aural_conformance.py \
+  --report reference-smoke-report.json \
+  --adapter python \
+  --adapter-arg tests/adapters/reference_core_reader_adapter.py
+```
+
+That adapter calls the existing AURAL Python Core Reader. It tests the runner and demonstrates the transport, but it is not an independent implementation and is not evidence of third-party interoperability.
+
+### Scoring, reports, and exit status
+
+The runner, not the adapter, compares observed and published outcomes. A negative case correctly reported as `reject` is `PASS`. A valid but wrong outcome is `FAIL`; launch, process, and protocol failures are `ERROR`; a deadline is `TIMEOUT`; and an explicitly unexecuted selected case is `SKIP`.
+
+The overall required result is:
+
+- `PASS` only when all 30 required Draft 0.2 cases pass;
+- `FAIL` when all required cases execute but one or more return the wrong valid outcome;
+- `INCOMPLETE` when required inventory or execution coverage is missing, skipped, timed out, or erroneous.
+
+Exit status `0` means required `PASS`, `1` means required `FAIL`, `2` means `INCOMPLETE`, and `3` means the runner could not establish or record a run because invocation, manifest, fixture, or report setup failed. Optional Draft 0.1 results are reported separately. Their failure, error, timeout, or skip does not silently change the required Core Reader 0.2 result.
+
+The versioned JSON report identifies the exact manifest digest, profile, adapter argument vector, non-secret platform/runtime metadata, timeout, optional selection, counts, and every selected case. An abridged example is:
+
+```json
+{
+  "schema": "urn:aural:conformance:runner-report",
+  "schema_version": 1,
+  "test_kit_version": "1",
+  "manifest": {
+    "path": "/local/checkout/tests/fixtures/conformance/core-reader-0.2-cases.v1.json",
+    "sha256": "<64 lowercase hexadecimal digits>"
+  },
+  "profile": {
+    "id": "aural-core-reader",
+    "version": "0.2-draft",
+    "status": "draft"
+  },
+  "optional_legacy_included": false,
+  "summary": {
+    "required_cases": 30,
+    "selected_cases": 30,
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0,
+    "execution_errors": 0,
+    "timeouts": 0,
+    "overall_result": "PASS"
+  },
+  "overall_result": "PASS",
+  "cases": [
+    {
+      "case_id": "aural-core-reader/0.2-draft/invalid-asset-hash",
+      "profile_id": "aural-core-reader",
+      "profile_version": "0.2-draft",
+      "requirement": "required",
+      "expected_outcome": "reject",
+      "observed_outcome": "reject",
+      "status": "PASS",
+      "duration_ms": 18,
+      "fixture": {
+        "path": "invalid-asset-hash.aural",
+        "size": 549,
+        "sha256": "5c4c576216a21905fb08aafcd15155099ee09130b52f2a6f1b4df52fd9bbf250"
+      }
+    }
+  ]
+}
+```
+
+The complete report also has `adapter`, `execution`, `generated_at`, nested required/optional counts, and a certification disclaimer. The runner does not record environment variables, credentials, adapter standard error, or arbitrary adapter diagnostics. Because the adapter command is recorded for reproducibility, do not place secrets in command-line arguments.
+
+The report output must be outside conformance fixture directories and cannot be a symbolic link. The runner writes it atomically. Treat adapters as trusted executable code: the runner is not a sandbox. It needs no network access itself, but it cannot prevent an adapter from using resources, including the network, that the operating system account permits.
+
+The current executable operation covers only Core Reader `verify-package`. Signed provenance, signed-event graphs, excerpt proofs, and acoustic reproduction need separate protocol revisions and are not supported merely because operation names are reserved. The Core corpus also excludes dynamically generated ZIP64 cases, writer coverage, large aggregate boundaries, side-channel analysis, key management, and the unlisted input space. Passing is useful evidence, not proof of correctness outside the published cases and not security certification.
+
 ## Experimental Graph Verifier profile
 
 The graph manifest is the language-neutral discovery point for all 35 active ordinary graph cases. Its stable IDs use the `aural-signed-event-graph/1/` namespace, and `source_case` preserves the identifier in the original graph index. The inventory contains 11 accepted and 24 rejected cases and depends on experimental provenance profile `org.aural.signature.ed25519-jcs-v1`, version 1. `expected.expectation_level` identifies these results as defined by the experimental profile; it does not promote implementation error text into a portable requirement.

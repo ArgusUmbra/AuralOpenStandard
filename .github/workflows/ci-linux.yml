@@ -79,6 +79,14 @@ jobs:
       - name: Validate public Core Reader conformance manifest
         run: python tools/validate_core_conformance_manifest.py
 
+      - name: Exercise Core Reader conformance runner
+        run: |
+          python tools/run_aural_conformance.py \
+            --profile core-reader-0.2 \
+            --report "${RUNNER_TEMP}/aural-core-reader-report.json" \
+            --adapter python \
+            --adapter-arg tests/adapters/reference_core_reader_adapter.py
+
       - name: Validate public provenance conformance manifest
         run: python tools/validate_provenance_conformance_manifest.py
 
