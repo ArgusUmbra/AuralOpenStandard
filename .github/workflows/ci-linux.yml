@@ -82,6 +82,9 @@ jobs:
       - name: Validate public provenance conformance manifest
         run: python tools/validate_provenance_conformance_manifest.py
 
+      - name: Validate public Graph Conformance Manifest
+        run: python tools/validate_graph_conformance_manifest.py
+
       - name: Run Python test suite
         run: python -W error -m unittest discover -s tests -v
 

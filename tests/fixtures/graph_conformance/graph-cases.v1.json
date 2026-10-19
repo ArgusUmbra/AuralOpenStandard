@@ -1,0 +1,1781 @@
+{
+  "schema": "urn:aural:conformance:signed-event-graph-cases",
+  "schema_version": 1,
+  "kit_manifest_version": "1",
+  "path_base": "tests/fixtures",
+  "specification": {
+    "title": "AURAL Experimental Signed-Event Graph Profile 1",
+    "revision": "1",
+    "status": "experimental",
+    "path": "docs/SIGNED-EVENT-GRAPH-1-EXPERIMENTAL.md"
+  },
+  "profile": {
+    "id": "aural-signed-event-graph",
+    "revision": "1",
+    "status": "experimental",
+    "depends_on": {
+      "id": "org.aural.signature.ed25519-jcs-v1",
+      "version": "1",
+      "status": "experimental"
+    },
+    "ordinary_case_count": 35,
+    "accepted_case_count": 11,
+    "rejected_case_count": 24
+  },
+  "source_index": {
+    "role": "source-case-index",
+    "path": "graph_conformance/cases.json",
+    "size": 26067,
+    "sha256": "47f80a580f78eb7956b11801b35b82fb539a6cd24d7000efe98055e6c96cd034"
+  },
+  "scope": {
+    "coverage": "complete-active-ordinary-experimental-graph-case-inventory",
+    "limitations": [
+      "This manifest publishes existing revision-1 behavior and does not define new graph or cryptographic semantics.",
+      "Graph consistency and closed declared-parent resolution do not establish historical completeness; successful cases require history_completeness = not_established.",
+      "The opt-in 64 MiB aggregate event-byte suite is separate and was not executed for this ordinary conformance pack.",
+      "Passing these cases does not establish identity, authorization, trusted time, semantic truth, complete profile conformance, certification, or security assurance."
+    ]
+  },
+  "separate_resource_suites": [
+    {
+      "id": "aural-signed-event-graph/1/aggregate-event-bytes-64mib",
+      "resource_tier": "opt-in-large-generated",
+      "ordinary_case_inventory": false,
+      "index": {
+        "role": "resource-suite-index",
+        "path": "graph_conformance/aggregate-byte-limit-cases.json",
+        "size": 1538,
+        "sha256": "e2a1de8d772d91bfae43c68e83e15ff3fce52343e4ca030898f31399bd054fc8"
+      },
+      "execution_environment": "AURAL_RUN_LARGE_GRAPH_BOUNDARY=1",
+      "limitation": "The index commits generation parameters and ordered-input digests but does not contain the generated event bytes; an unrestricted full resource-boundary claim requires a separate successful run or equivalent evidence."
+    }
+  ],
+  "cases": [
+    {
+      "id": "aural-signed-event-graph/1/a-signed-root-no-package",
+      "source_case": "A-signed-root-no-package",
+      "description": "One genuine signed root with no package supplied.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "signed-event-graph-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 1,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 0,
+          "maximum_depth": 1,
+          "ordered_events": [
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-8444-555555555555",
+              "signed_event_sha256": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/b-signed-root-matching-package",
+      "source_case": "B-signed-root-matching-package",
+      "description": "The genuine root binds all six subject fields to an independently verified Draft 0.2 package.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "aural-draft-0.2-subject-binding",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "verified",
+          "unique_event_count": 1,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 0,
+          "maximum_depth": 1,
+          "ordered_events": [
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-8444-555555555555",
+              "signed_event_sha256": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/c-parent-child",
+      "source_case": "C-parent-child",
+      "description": "A genuine child supplied before its genuine parent resolves to exact parent-first order.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "signed-event-graph-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-received-with-parent.json",
+          "size": 1631,
+          "sha256": "ae11fac3a420a5dd24d24e52443f22d565b1fc71a12b839d330b8595dcced2d3"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 2,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 1,
+          "maximum_depth": 2,
+          "ordered_events": [
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-8444-555555555555",
+              "signed_event_sha256": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e"
+            },
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-a444-555555555555",
+              "signed_event_sha256": "046f625d475a05f792d7f41354e12e016c2e32690034f157515b63337384937d"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/d-identical-duplicates",
+      "source_case": "D-identical-duplicates",
+      "description": "Three byte-identical inputs collapse to one logical event and count two duplicates.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "signed-event-graph-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 2,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 3,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 1,
+          "duplicate_input_count": 2,
+          "declared_parent_count": 0,
+          "maximum_depth": 1,
+          "ordered_events": [
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-8444-555555555555",
+              "signed_event_sha256": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/e-independent-roots",
+      "source_case": "E-independent-roots",
+      "description": "Two independent roots use deterministic event-ID order despite reversed input order.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "signed-event-graph-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-unknown-optional.json",
+          "size": 1538,
+          "sha256": "bc8e3f88f88c090c7588ff1d33101a6679b6605ac5e222aeea81a40d0f414572"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 2,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 0,
+          "maximum_depth": 1,
+          "ordered_events": [
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-8444-555555555555",
+              "signed_event_sha256": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e"
+            },
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-9444-555555555555",
+              "signed_event_sha256": "6ca603ec338e14aefa93510dbd727b2b31048bfe5cfa3b627c1130b34ea7cbea"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/f-multi-parent-history",
+      "source_case": "F-multi-parent-history",
+      "description": "A genuinely signed event references two exact genuine parents and follows both in dependency order.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "signed-event-graph-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/valid-multi-parent.json",
+          "size": 1813,
+          "sha256": "906b2db9744b971fd5fe650c3bd8fa2ff94344b43cbab95e8731df1078191a7e"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "provenance/valid-unknown-optional.json",
+          "size": 1538,
+          "sha256": "bc8e3f88f88c090c7588ff1d33101a6679b6605ac5e222aeea81a40d0f414572"
+        },
+        {
+          "order": 2,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 3,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 3,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 2,
+          "maximum_depth": 2,
+          "ordered_events": [
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-8444-555555555555",
+              "signed_event_sha256": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e"
+            },
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-9444-555555555555",
+              "signed_event_sha256": "6ca603ec338e14aefa93510dbd727b2b31048bfe5cfa3b627c1130b34ea7cbea"
+            },
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-a444-555555555555",
+              "signed_event_sha256": "9656cab8765ad6c4741424c0eb71f6dd3f5faad243a08510b1c690005496de05"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/g-input-order-independence",
+      "source_case": "G-input-order-independence",
+      "description": "The same multi-parent graph in a different input order has the identical normalized result.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "signed-event-graph-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "graph_conformance/valid-multi-parent.json",
+          "size": 1813,
+          "sha256": "906b2db9744b971fd5fe650c3bd8fa2ff94344b43cbab95e8731df1078191a7e"
+        },
+        {
+          "order": 2,
+          "role": "signed-event",
+          "path": "provenance/valid-unknown-optional.json",
+          "size": 1538,
+          "sha256": "bc8e3f88f88c090c7588ff1d33101a6679b6605ac5e222aeea81a40d0f414572"
+        },
+        {
+          "order": 3,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 3,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 2,
+          "maximum_depth": 2,
+          "ordered_events": [
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-8444-555555555555",
+              "signed_event_sha256": "e01de77607deebd20886b063a8573ce0ced436081df57e734c11ea21c6f9870e"
+            },
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-9444-555555555555",
+              "signed_event_sha256": "6ca603ec338e14aefa93510dbd727b2b31048bfe5cfa3b627c1130b34ea7cbea"
+            },
+            {
+              "event_id": "urn:uuid:11111111-2222-4333-a444-555555555555",
+              "signed_event_sha256": "9656cab8765ad6c4741424c0eb71f6dd3f5faad243a08510b1c690005496de05"
+            }
+          ]
+        }
+      },
+      "equivalent_to": "aural-signed-event-graph/1/f-multi-parent-history"
+    },
+    {
+      "id": "aural-signed-event-graph/1/h-parent-fanout-64",
+      "source_case": "H-parent-fanout-64",
+      "description": "A genuinely signed event with exactly 64 exact parent references is accepted at the profile boundary.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "graph-resource-limits",
+      "resource_tier": "ordinary-compressed-boundary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/graph-resource-cases.json.gz",
+          "size": 86406,
+          "sha256": "502b62a1d48c23fb158db53efc39e5838b72863dae13079a7f7610b49c58f0eb",
+          "occurrence": "ordered-collection",
+          "representation": {
+            "type": "gzip-json-string-collection",
+            "compression": "gzip",
+            "expanded_media_type": "application/json",
+            "expanded_size": 1133570,
+            "expanded_sha256": "b77400135011dd54e7fb8423716e7b854fee975c5ae2027d77e2f0735eb66f34",
+            "container_schema": "org.aural.graph-resource-fixtures",
+            "container_schema_version": "1",
+            "collection": "fanout_64",
+            "selection": "all",
+            "selected_record_count": 65,
+            "selected_aggregate_bytes": 105572,
+            "selected_maximum_record_bytes": 13092,
+            "record_encoding": "UTF-8 bytes of each selected JSON string, with no added separator or terminator"
+          }
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 65,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 64,
+          "maximum_depth": 2,
+          "ordered_events": {
+            "derivation": "selected-collection-order",
+            "event_id_pointer": "/assertion/event_id",
+            "signed_event_sha256_algorithm": "AURAL-SIGNED-EVENT-V1 domain-separated SHA-256"
+          }
+        }
+      },
+      "resource_boundary": {
+        "dimension": "parent-references-per-event",
+        "profile_limit": 64,
+        "case_value": 64,
+        "position": "at-limit"
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/i-graph-depth-256",
+      "source_case": "I-graph-depth-256",
+      "description": "A genuinely signed chain whose root-counted maximum depth is exactly 256 is accepted at the profile boundary.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "graph-resource-limits",
+      "resource_tier": "ordinary-compressed-boundary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/graph-resource-cases.json.gz",
+          "size": 86406,
+          "sha256": "502b62a1d48c23fb158db53efc39e5838b72863dae13079a7f7610b49c58f0eb",
+          "occurrence": "ordered-collection",
+          "representation": {
+            "type": "gzip-json-string-collection",
+            "compression": "gzip",
+            "expanded_media_type": "application/json",
+            "expanded_size": 1133570,
+            "expanded_sha256": "b77400135011dd54e7fb8423716e7b854fee975c5ae2027d77e2f0735eb66f34",
+            "container_schema": "org.aural.graph-resource-fixtures",
+            "container_schema_version": "1",
+            "collection": "depth_256",
+            "selection": "all",
+            "selected_record_count": 256,
+            "selected_aggregate_bytes": 416075,
+            "selected_maximum_record_bytes": 1626,
+            "record_encoding": "UTF-8 bytes of each selected JSON string, with no added separator or terminator"
+          }
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 256,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 255,
+          "maximum_depth": 256,
+          "ordered_events": {
+            "derivation": "selected-collection-order",
+            "event_id_pointer": "/assertion/event_id",
+            "signed_event_sha256_algorithm": "AURAL-SIGNED-EVENT-V1 domain-separated SHA-256"
+          }
+        }
+      },
+      "resource_boundary": {
+        "dimension": "resolved-graph-depth",
+        "profile_limit": 256,
+        "case_value": 256,
+        "position": "at-limit"
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/h-event-bytes-at-limit",
+      "source_case": "H-event-bytes-at-limit",
+      "description": "One canonical genuinely signed record of exactly 1,048,576 bytes is accepted at the per-record boundary.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "graph-resource-limits",
+      "resource_tier": "ordinary-compressed-boundary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/graph-event-byte-limit-cases.json.gz",
+          "size": 4026,
+          "sha256": "60c4c6d9ef3933a9fc1736ded925ff9e0e2f59b29e058bf9021879fbedd63d3e",
+          "occurrence": "ordered-collection",
+          "representation": {
+            "type": "gzip-json-string-collection",
+            "compression": "gzip",
+            "expanded_media_type": "application/json",
+            "expanded_size": 2097542,
+            "expanded_sha256": "8bfedd86de748548c8a116d848d79b16b0f07bfbed2258bc10ff7e96f8c19282",
+            "container_schema": "org.aural.graph-resource-fixtures",
+            "container_schema_version": "1",
+            "collection": "event_bytes_at_limit",
+            "selection": "all",
+            "selected_record_count": 1,
+            "selected_aggregate_bytes": 1048576,
+            "selected_maximum_record_bytes": 1048576,
+            "record_encoding": "UTF-8 bytes of each selected JSON string, with no added separator or terminator"
+          }
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 1,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 0,
+          "maximum_depth": 1,
+          "ordered_events": {
+            "derivation": "selected-collection-order",
+            "event_id_pointer": "/assertion/event_id",
+            "signed_event_sha256_algorithm": "AURAL-SIGNED-EVENT-V1 domain-separated SHA-256"
+          }
+        }
+      },
+      "resource_boundary": {
+        "dimension": "signed-event-record-bytes",
+        "profile_limit": 1048576,
+        "case_value": 1048576,
+        "position": "at-limit"
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/h-event-count-4096",
+      "source_case": "H-event-count-4096",
+      "description": "Exactly 4,096 distinct genuinely signed independent roots are accepted at the graph event-count boundary.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "graph-resource-limits",
+      "resource_tier": "ordinary-compressed-boundary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/graph-event-count-cases.json.gz",
+          "size": 338405,
+          "sha256": "a5f3f3bc2dccdfec7dadc7cc8fafeecb88f7989f1a0791bb8f803b433aa49415",
+          "occurrence": "ordered-collection",
+          "representation": {
+            "type": "gzip-json-string-collection",
+            "compression": "gzip",
+            "expanded_media_type": "application/json",
+            "expanded_size": 6416007,
+            "expanded_sha256": "f81796f9995dd9e71407656dd17cf516ec4b5b51710ceb1617a9f0eab891bb9c",
+            "container_schema": "org.aural.graph-resource-fixtures",
+            "container_schema_version": "1",
+            "collection": "event_count_roots",
+            "selection": "prefix",
+            "selected_record_count": 4096,
+            "selected_aggregate_bytes": 5918720,
+            "selected_maximum_record_bytes": 1445,
+            "record_encoding": "UTF-8 bytes of each selected JSON string, with no added separator or terminator"
+          }
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "accept",
+        "expectation_level": "experimental-profile-defined",
+        "graph": {
+          "status": "consistent",
+          "declared_parent_closure": "closed",
+          "history_completeness": "not_established",
+          "package_integrity": "not_checked",
+          "unique_event_count": 4096,
+          "duplicate_input_count": 0,
+          "declared_parent_count": 0,
+          "maximum_depth": 1,
+          "ordered_events": {
+            "derivation": "selected-collection-order",
+            "event_id_pointer": "/assertion/event_id",
+            "signed_event_sha256_algorithm": "AURAL-SIGNED-EVENT-V1 domain-separated SHA-256"
+          }
+        }
+      },
+      "resource_boundary": {
+        "dimension": "signed-event-input-records",
+        "profile_limit": 4096,
+        "case_value": 4096,
+        "position": "at-limit"
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n01-invalid-ed25519-signature",
+      "source_case": "N01-invalid-ed25519-signature",
+      "description": "A structurally valid canonical event is rejected when its Ed25519 signature is invalid.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "ed25519-uncofactored-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-signature.json",
+          "size": 1445,
+          "sha256": "d57a33ecdece3a2df37fd210813b36a44d4ed336794482925f77af84c6c80523"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "signature",
+          "stage": "signature"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n02-missing-declared-parent",
+      "source_case": "N02-missing-declared-parent",
+      "description": "A valid signed child is rejected when its declared parent is omitted from the supplied records.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "signed-event-graph-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-received-with-parent.json",
+          "size": 1631,
+          "sha256": "ae11fac3a420a5dd24d24e52443f22d565b1fc71a12b839d330b8595dcced2d3"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "missing_parent",
+          "stage": "graph"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n03-parent-digest-mismatch",
+      "source_case": "N03-parent-digest-mismatch",
+      "description": "A genuinely signed child is rejected when its supplied parent's signed-event digest does not match the declared reference.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "signed-event-graph-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/parent-digest-mismatch.json",
+          "size": 1631,
+          "sha256": "d96c419647e3a0757c3a7b63894dc79da676372322975c1a867a5975f72ba202"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "parent_digest_mismatch",
+          "stage": "graph"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n04-unrelated-valid-package",
+      "source_case": "N04-unrelated-valid-package",
+      "description": "A genuine signed root is rejected when bound to an independently valid package with a different manifest subject.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "aural-draft-0.2-subject-binding",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-independent.aural",
+          "size": 549,
+          "sha256": "66968f5b917d972797cac9a4b6600e3c6743600653cb8183536ee77b7a666a2b"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "subject_binding",
+          "stage": "package"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n05-corrupted-original-audio",
+      "source_case": "N05-corrupted-original-audio",
+      "description": "A genuine signed root is rejected during independent archive verification when the original WAV bytes do not match the manifest integrity value.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "aural-draft-0.2-subject-binding",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/invalid-altered-original.aural",
+          "size": 549,
+          "sha256": "beeaaf62836cdbd8eae08ec97d2ea4d990aa245475d1919de2faa6ed05500ae6"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "package_integrity",
+          "stage": "package"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n06-invalid-manifest",
+      "source_case": "N06-invalid-manifest",
+      "description": "A genuine signed root is rejected during independent archive verification when the ZIP opens but manifest.json is malformed JSON.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "aural-draft-0.2-subject-binding",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/invalid-malformed-json.aural",
+          "size": 298,
+          "sha256": "769e17135887991505f32879222dcd838b44f1246da498044e18a6dace7f8c0a"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "package_integrity",
+          "stage": "package"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n07-invalid-zip-structure",
+      "source_case": "N07-invalid-zip-structure",
+      "description": "A genuine signed root is rejected during independent archive verification when the ZIP local file header signature is malformed.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "aural-draft-0.2-subject-binding",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/invalid-malformed-local-header.aural",
+          "size": 549,
+          "sha256": "a00ab5632514ac461b94dc857efcc07c57e2ba09dea5e208d9ebf6f1db0823e2"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "package_integrity",
+          "stage": "package"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n08-missing-signing-key",
+      "source_case": "N08-missing-signing-key",
+      "description": "A valid signed root is rejected when no public-key record matches its signing key identifier.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "provenance-public-key-record-v1",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "missing_key",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n09-malformed-public-key",
+      "source_case": "N09-malformed-public-key",
+      "description": "A valid signed root is rejected when the supplied canonical key record uses forbidden padded base64url encoding.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "provenance-public-key-record-v1",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-encoding.json",
+          "size": 243,
+          "sha256": "7f421e14ba755ad33aecf8491c1e4d6a38157339f0534141e3650775c9fa7673"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "encoding",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n10-incorrect-key-id",
+      "source_case": "N10-incorrect-key-id",
+      "description": "A valid signed root is rejected when the supplied key record's declared identifier does not match its public-key bytes.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "provenance-public-key-record-v1",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-id.json",
+          "size": 242,
+          "sha256": "ef22519a81ff5fe48393df5f788fd877701b0ed04e87b1bdb43c735f90ab7304"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "key_id_mismatch",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n11-duplicate-public-key-id",
+      "source_case": "N11-duplicate-public-key-id",
+      "description": "A valid signed root is rejected when the same valid public-key record is supplied twice.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "provenance-public-key-record-v1",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "duplicate_key",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n12-invalid-ed25519-profile",
+      "source_case": "N12-invalid-ed25519-profile",
+      "description": "A canonical root with an out-of-range Ed25519 scalar is rejected by the strict signature profile.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "ed25519-uncofactored-verification",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-signature-scalar.json",
+          "size": 1445,
+          "sha256": "a237086341ef0e5f773d98f08b81667edb4889fa48849ddc991667c78471e870"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "signature",
+          "stage": "signature"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n13-parent-fanout-65",
+      "source_case": "N13-parent-fanout-65",
+      "description": "A genuinely signed event with 65 exact valid parent references is rejected at the graph resource boundary.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "graph-resource-limits",
+      "resource_tier": "ordinary-compressed-boundary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/graph-resource-cases.json.gz",
+          "size": 86406,
+          "sha256": "502b62a1d48c23fb158db53efc39e5838b72863dae13079a7f7610b49c58f0eb",
+          "occurrence": "ordered-collection",
+          "representation": {
+            "type": "gzip-json-string-collection",
+            "compression": "gzip",
+            "expanded_media_type": "application/json",
+            "expanded_size": 1133570,
+            "expanded_sha256": "b77400135011dd54e7fb8423716e7b854fee975c5ae2027d77e2f0735eb66f34",
+            "container_schema": "org.aural.graph-resource-fixtures",
+            "container_schema_version": "1",
+            "collection": "fanout_65",
+            "selection": "all",
+            "selected_record_count": 66,
+            "selected_aggregate_bytes": 107199,
+            "selected_maximum_record_bytes": 13274,
+            "record_encoding": "UTF-8 bytes of each selected JSON string, with no added separator or terminator"
+          }
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "resource_limit",
+          "stage": "graph"
+        }
+      },
+      "resource_boundary": {
+        "dimension": "parent-references-per-event",
+        "profile_limit": 64,
+        "case_value": 65,
+        "position": "over-limit"
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n14-graph-depth-257",
+      "source_case": "N14-graph-depth-257",
+      "description": "A genuinely signed chain reaching root-counted depth 257 is rejected at the graph resource boundary.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "graph-resource-limits",
+      "resource_tier": "ordinary-compressed-boundary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/graph-resource-cases.json.gz",
+          "size": 86406,
+          "sha256": "502b62a1d48c23fb158db53efc39e5838b72863dae13079a7f7610b49c58f0eb",
+          "occurrence": "ordered-collection",
+          "representation": {
+            "type": "gzip-json-string-collection",
+            "compression": "gzip",
+            "expanded_media_type": "application/json",
+            "expanded_size": 1133570,
+            "expanded_sha256": "b77400135011dd54e7fb8423716e7b854fee975c5ae2027d77e2f0735eb66f34",
+            "container_schema": "org.aural.graph-resource-fixtures",
+            "container_schema_version": "1",
+            "collection": "depth_257",
+            "selection": "all",
+            "selected_record_count": 257,
+            "selected_aggregate_bytes": 417701,
+            "selected_maximum_record_bytes": 1626,
+            "record_encoding": "UTF-8 bytes of each selected JSON string, with no added separator or terminator"
+          }
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "resource_limit",
+          "stage": "graph"
+        }
+      },
+      "resource_boundary": {
+        "dimension": "resolved-graph-depth",
+        "profile_limit": 256,
+        "case_value": 257,
+        "position": "over-limit"
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n-event-bytes-over-limit",
+      "source_case": "N-event-bytes-over-limit",
+      "description": "One canonical genuinely signed record of exactly 1,048,577 bytes is rejected at the per-record input boundary.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "graph-resource-limits",
+      "resource_tier": "ordinary-compressed-boundary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/graph-event-byte-limit-cases.json.gz",
+          "size": 4026,
+          "sha256": "60c4c6d9ef3933a9fc1736ded925ff9e0e2f59b29e058bf9021879fbedd63d3e",
+          "occurrence": "ordered-collection",
+          "representation": {
+            "type": "gzip-json-string-collection",
+            "compression": "gzip",
+            "expanded_media_type": "application/json",
+            "expanded_size": 2097542,
+            "expanded_sha256": "8bfedd86de748548c8a116d848d79b16b0f07bfbed2258bc10ff7e96f8c19282",
+            "container_schema": "org.aural.graph-resource-fixtures",
+            "container_schema_version": "1",
+            "collection": "event_bytes_over_limit",
+            "selection": "all",
+            "selected_record_count": 1,
+            "selected_aggregate_bytes": 1048577,
+            "selected_maximum_record_bytes": 1048577,
+            "record_encoding": "UTF-8 bytes of each selected JSON string, with no added separator or terminator"
+          }
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "resource_limit",
+          "stage": "input"
+        }
+      },
+      "resource_boundary": {
+        "dimension": "signed-event-record-bytes",
+        "profile_limit": 1048576,
+        "case_value": 1048577,
+        "position": "over-limit"
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n-event-count-4097",
+      "source_case": "N-event-count-4097",
+      "description": "The same 4,096 independent roots plus one additional distinct genuinely signed root are rejected at the graph event-count boundary.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "graph-resource-limits",
+      "resource_tier": "ordinary-compressed-boundary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/graph-event-count-cases.json.gz",
+          "size": 338405,
+          "sha256": "a5f3f3bc2dccdfec7dadc7cc8fafeecb88f7989f1a0791bb8f803b433aa49415",
+          "occurrence": "ordered-collection",
+          "representation": {
+            "type": "gzip-json-string-collection",
+            "compression": "gzip",
+            "expanded_media_type": "application/json",
+            "expanded_size": 6416007,
+            "expanded_sha256": "f81796f9995dd9e71407656dd17cf516ec4b5b51710ceb1617a9f0eab891bb9c",
+            "container_schema": "org.aural.graph-resource-fixtures",
+            "container_schema_version": "1",
+            "collection": "event_count_roots",
+            "selection": "all",
+            "selected_record_count": 4097,
+            "selected_aggregate_bytes": 5920165,
+            "selected_maximum_record_bytes": 1445,
+            "record_encoding": "UTF-8 bytes of each selected JSON string, with no added separator or terminator"
+          }
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "resource_limit",
+          "stage": "input"
+        }
+      },
+      "resource_boundary": {
+        "dimension": "signed-event-input-records",
+        "profile_limit": 4096,
+        "case_value": 4097,
+        "position": "over-limit"
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n15-competing-malformed-forward",
+      "source_case": "N15-competing-malformed-forward",
+      "description": "Two differently malformed signed-event records deterministically select the same semantic failure in forward input order.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "deterministic-signed-event-validation-order",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-noncanonical.json",
+          "size": 1793,
+          "sha256": "2f69991d1ed7a55cc19591c5891a47dfb6f3667befd2a3a5c1980557b348bbef"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "provenance/invalid-bom.json",
+          "size": 1448,
+          "sha256": "95f08d9c85b9a22a8189cc1dd3cbbc1048d19e325b147fcd4e48625df4a4b350"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "canonicalization",
+          "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n16-competing-malformed-reverse",
+      "source_case": "N16-competing-malformed-reverse",
+      "description": "The same malformed records in reverse input order produce the identical deterministic failure.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "deterministic-signed-event-validation-order",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-bom.json",
+          "size": 1448,
+          "sha256": "95f08d9c85b9a22a8189cc1dd3cbbc1048d19e325b147fcd4e48625df4a4b350"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "provenance/invalid-noncanonical.json",
+          "size": 1793,
+          "sha256": "2f69991d1ed7a55cc19591c5891a47dfb6f3667befd2a3a5c1980557b348bbef"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "canonicalization",
+          "stage": "record"
+        }
+      },
+      "equivalent_to": "aural-signed-event-graph/1/n15-competing-malformed-forward"
+    },
+    {
+      "id": "aural-signed-event-graph/1/n17-noncanonical-signature-encoding",
+      "source_case": "N17-noncanonical-signature-encoding",
+      "description": "Noncanonical padded signature text is rejected during pre-graph record validation.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "canonical-signature-text",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-padded-signature.json",
+          "size": 1447,
+          "sha256": "8427d640d16c16315352e02b59217f9e4f026cd14d043793e0b006413237bbb7"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "encoding",
+          "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n18-noncanonical-signature-with-missing-parent",
+      "source_case": "N18-noncanonical-signature-with-missing-parent",
+      "description": "Noncanonical signature text is rejected before a competing missing-parent failure.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "canonical-signature-text",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/materialized/n18-noncanonical-signature-with-missing-parent.json",
+          "size": 1633,
+          "sha256": "383e7f6e800f1f2189415bba6f339daade83169e1545d82d797ca60f0fffbfd0"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "encoding",
+          "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n19-noncanonical-signature-with-parent-digest-mismatch",
+      "source_case": "N19-noncanonical-signature-with-parent-digest-mismatch",
+      "description": "Noncanonical signature text is rejected before a competing parent-digest mismatch.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "canonical-signature-text",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "graph_conformance/materialized/n19-noncanonical-signature-with-parent-digest-mismatch.json",
+          "size": 1633,
+          "sha256": "d378462a4c60da9bf9a44d9dfaabba0bf27870bd959b40effda06f5fdb848a79"
+        },
+        {
+          "order": 1,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "encoding",
+          "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n20-invalid-public-key-algorithm",
+      "source_case": "N20-invalid-public-key-algorithm",
+      "description": "A public-key record with an unsupported algorithm is rejected at the key stage.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "deterministic-public-key-validation-order",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-algorithm.json",
+          "size": 240,
+          "sha256": "7c7507488381516b784ac7fc4382d7f2a451ca9f3587f31cbe0a682690e3b085"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "unsupported_algorithm",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n21-competing-malformed-keys-algorithm-first",
+      "source_case": "N21-competing-malformed-keys-algorithm-first",
+      "description": "Competing malformed keys select the digest-ordered unsupported-algorithm failure in algorithm-first caller order.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "deterministic-public-key-validation-order",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-algorithm.json",
+          "size": 240,
+          "sha256": "7c7507488381516b784ac7fc4382d7f2a451ca9f3587f31cbe0a682690e3b085"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-encoding.json",
+          "size": 243,
+          "sha256": "7f421e14ba755ad33aecf8491c1e4d6a38157339f0534141e3650775c9fa7673"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "unsupported_algorithm",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "aural-signed-event-graph/1/n22-competing-malformed-keys-encoding-first",
+      "source_case": "N22-competing-malformed-keys-encoding-first",
+      "description": "Competing malformed keys select the same digest-ordered failure in reversed caller order.",
+      "applicable_profile": {
+        "id": "aural-signed-event-graph",
+        "revision": "1",
+        "status": "experimental"
+      },
+      "required_capability": "deterministic-public-key-validation-order",
+      "resource_tier": "ordinary",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-encoding.json",
+          "size": 243,
+          "sha256": "7f421e14ba755ad33aecf8491c1e4d6a38157339f0534141e3650775c9fa7673"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-algorithm.json",
+          "size": 240,
+          "sha256": "7c7507488381516b784ac7fc4382d7f2a451ca9f3587f31cbe0a682690e3b085"
+        }
+      ],
+      "expected": {
+        "outcome": "reject",
+        "expectation_level": "experimental-profile-defined",
+        "failure": {
+          "category": "unsupported_algorithm",
+          "stage": "key"
+        }
+      },
+      "equivalent_to": "aural-signed-event-graph/1/n21-competing-malformed-keys-algorithm-first"
+    }
+  ]
+}
