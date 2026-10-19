@@ -21,6 +21,7 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / 'tests' / 'fixtures' / 'provenance'
+PUBLIC_METADATA = {'expected.json', 'provenance-cases.v1.json'}
 ED25519_P = (1 << 255) - 19
 ED25519_L = (1 << 252) + 27742317777372353535851937790883648493
 SMALL_ORDER_Y = {
@@ -99,7 +100,7 @@ class ProvenanceSignatureTests(unittest.TestCase):
 
     def test_fixture_hashes_key_id_and_record_digest(self):
         actual_files = {path.name for path in CORPUS.iterdir()
-                        if path.is_file() and path.name != 'expected.json'}
+                        if path.is_file() and path.name not in PUBLIC_METADATA}
         self.assertEqual(set(self.expected['files_sha256']), actual_files)
         for name, digest in self.expected['files_sha256'].items():
             with self.subTest(file=name):

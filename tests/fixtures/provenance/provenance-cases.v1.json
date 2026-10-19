@@ -1,0 +1,1781 @@
+{
+  "schema": "urn:aural:conformance:provenance-cases",
+  "schema_version": 1,
+  "kit_manifest_version": "1",
+  "path_base": "tests/fixtures",
+  "specification": {
+    "title": "AURAL Experimental Provenance Signature Profile 1",
+    "version": "1",
+    "status": "experimental",
+    "path": "docs/PROVENANCE-SIGNATURE-1-DRAFT.md"
+  },
+  "profile": {
+    "id": "org.aural.signature.ed25519-jcs-v1",
+    "version": "1",
+    "status": "experimental",
+    "event_schema": "org.aural.provenance-event",
+    "event_schema_version": "1",
+    "case_count": 45,
+    "accepted_case_count": 3,
+    "rejected_case_count": 42,
+    "ed25519_vector_count": 13,
+    "required_capabilities": [
+      "strict-json-and-jcs",
+      "ed25519-uncofactored-verification",
+      "provenance-public-key-record-v1",
+      "aural-draft-0.2-subject-binding",
+      "signed-event-parent-references"
+    ]
+  },
+  "source_index": {
+    "role": "source-case-index",
+    "path": "provenance/expected.json",
+    "size": 25027,
+    "sha256": "0a2408558d63e25d7240819ab1653da41c7e0f36e5516df4bad16f2cd6bc83ed"
+  },
+  "scope": {
+    "coverage": "public-experimental-provenance-case-inventory",
+    "limitations": [
+      "The manifest publishes the existing signed-event corpus and does not define new cryptographic or diagnostic rules.",
+      "Signed-event graph traversal, resolution, aggregate limits, trust policy, identity, revocation, and trusted time are not covered.",
+      "Passing the listed cases does not establish complete profile conformance or independent security certification."
+    ]
+  },
+  "cases": [
+    {
+      "id": "aural-provenance/1/valid-original-acquired",
+      "source_case": "valid-original-acquired",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-original-acquired.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "accept"
+      },
+      "informative_reason": "complete original-asset-acquired vector"
+    },
+    {
+      "id": "aural-provenance/1/valid-received-with-parent",
+      "source_case": "valid-received-with-parent",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-received-with-parent.json",
+          "size": 1631,
+          "sha256": "ae11fac3a420a5dd24d24e52443f22d565b1fc71a12b839d330b8595dcced2d3"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "accept"
+      },
+      "informative_reason": "received evidence references the golden parent"
+    },
+    {
+      "id": "aural-provenance/1/valid-unknown-optional",
+      "source_case": "valid-unknown-optional",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/valid-unknown-optional.json",
+          "size": 1538,
+          "sha256": "bc8e3f88f88c090c7588ff1d33101a6679b6605ac5e222aeea81a40d0f414572"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "accept"
+      },
+      "informative_reason": "unknown non-critical extension"
+    },
+    {
+      "id": "aural-provenance/1/invalid-noncanonical",
+      "source_case": "invalid-noncanonical",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-noncanonical.json",
+          "size": 1793,
+          "sha256": "2f69991d1ed7a55cc19591c5891a47dfb6f3667befd2a3a5c1980557b348bbef"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "pretty-printed record is not exact JCS"
+    },
+    {
+      "id": "aural-provenance/1/invalid-trailing-newline",
+      "source_case": "invalid-trailing-newline",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-trailing-newline.json",
+          "size": 1446,
+          "sha256": "99c520cc6810e08ac82dbac91f6941031a08b4f811245f3ce9271d0c0decf9a3"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "canonical record has a trailing LF"
+    },
+    {
+      "id": "aural-provenance/1/invalid-bom",
+      "source_case": "invalid-bom",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-bom.json",
+          "size": 1448,
+          "sha256": "95f08d9c85b9a22a8189cc1dd3cbbc1048d19e325b147fcd4e48625df4a4b350"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "record begins with a UTF-8 BOM"
+    },
+    {
+      "id": "aural-provenance/1/invalid-utf8",
+      "source_case": "invalid-utf8",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-utf8.json",
+          "size": 1445,
+          "sha256": "77d9da2866caa60d98fafe828ec4dc24d3eae458ea96641fb1d1912fad48760d"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "record contains invalid UTF-8"
+    },
+    {
+      "id": "aural-provenance/1/invalid-duplicate-name",
+      "source_case": "invalid-duplicate-name",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-duplicate-name.json",
+          "size": 1546,
+          "sha256": "3fe2a0761741207eed854ea06378474475ce977dc46d4d047078ac6940b556e5"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "envelope contains a duplicate signature name"
+    },
+    {
+      "id": "aural-provenance/1/invalid-envelope-member",
+      "source_case": "invalid-envelope-member",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-envelope-member.json",
+          "size": 1461,
+          "sha256": "80cfdbe85607e7beaaabd3030b6170fde3bb12d88b35b1d87afb6f9570876bba"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unknown envelope member suggests multisignature"
+    },
+    {
+      "id": "aural-provenance/1/invalid-signature",
+      "source_case": "invalid-signature",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-signature.json",
+          "size": 1445,
+          "sha256": "d57a33ecdece3a2df37fd210813b36a44d4ed336794482925f77af84c6c80523"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "one signature bit is changed"
+    },
+    {
+      "id": "aural-provenance/1/invalid-padded-signature",
+      "source_case": "invalid-padded-signature",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-padded-signature.json",
+          "size": 1447,
+          "sha256": "8427d640d16c16315352e02b59217f9e4f026cd14d043793e0b006413237bbb7"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "signature uses padded base64url"
+    },
+    {
+      "id": "aural-provenance/1/invalid-signature-scalar",
+      "source_case": "invalid-signature-scalar",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-signature-scalar.json",
+          "size": 1445,
+          "sha256": "a237086341ef0e5f773d98f08b81667edb4889fa48849ddc991667c78471e870"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "signature has an out-of-range S scalar"
+    },
+    {
+      "id": "aural-provenance/1/invalid-signature-profile",
+      "source_case": "invalid-signature-profile",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-signature-profile.json",
+          "size": 1440,
+          "sha256": "063b964245c4023fadb7297c67c3647ffc9b48a9088fd651f03e8e2978760703"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unknown signature profile fails closed"
+    },
+    {
+      "id": "aural-provenance/1/invalid-schema-version",
+      "source_case": "invalid-schema-version",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-schema-version.json",
+          "size": 1445,
+          "sha256": "27a6ef8752af50ba133b3429ab6217185e1c13d1ab140b82a668ab62f5db36fd"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unknown event schema version fails closed"
+    },
+    {
+      "id": "aural-provenance/1/invalid-event-id",
+      "source_case": "invalid-event-id",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-event-id.json",
+          "size": 1445,
+          "sha256": "a82018e680ccebf5c81ea12703e21f508bfa7fec2c987d2d4f9be5d98989abb0"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "event identifier is not UUIDv4"
+    },
+    {
+      "id": "aural-provenance/1/invalid-unknown-member",
+      "source_case": "invalid-unknown-member",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-unknown-member.json",
+          "size": 1481,
+          "sha256": "fd74d04bcefe5727c9724ebcd6af4d2685e6434955c87bae6c3fe6eb72f94084"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unknown assertion core member"
+    },
+    {
+      "id": "aural-provenance/1/invalid-critical-extension",
+      "source_case": "invalid-critical-extension",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-critical-extension.json",
+          "size": 1535,
+          "sha256": "aacddc6852a52e08743704a73dca446b0fa21f88f523d968fab173727353935d"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unknown critical extension"
+    },
+    {
+      "id": "aural-provenance/1/invalid-critical-extension-missing",
+      "source_case": "invalid-critical-extension-missing",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-critical-extension-missing.json",
+          "size": 1491,
+          "sha256": "18359ff37edf06493dfbdc499bc12659380eaa8cabda381d87c972fa665e28f3"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "critical extension has no corresponding value"
+    },
+    {
+      "id": "aural-provenance/1/invalid-timestamp",
+      "source_case": "invalid-timestamp",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-timestamp.json",
+          "size": 1445,
+          "sha256": "ef782b9a98da726600433fc91c5d2233a2bb2cedf425ff0692ef9de81e1ec136"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "invalid RFC 3339 calendar date"
+    },
+    {
+      "id": "aural-provenance/1/invalid-time-basis",
+      "source_case": "invalid-time-basis",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-time-basis.json",
+          "size": 1437,
+          "sha256": "4ba57a56d60fe0dab3781fcc1ba28aaa8820187b837cabe88b65e126e4f2853f"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "trusted is not a supported claimed-time basis"
+    },
+    {
+      "id": "aural-provenance/1/invalid-time-order",
+      "source_case": "invalid-time-order",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-time-order.json",
+          "size": 1445,
+          "sha256": "babb92d8a29e4f6e95c57d0057f430abec58cc580ea2b6fb50b7ae6deff29e6d"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "claimed-time entries are out of required order"
+    },
+    {
+      "id": "aural-provenance/1/invalid-source-pair",
+      "source_case": "invalid-source-pair",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-source-pair.json",
+          "size": 1445,
+          "sha256": "4569872e638dae653f53f18cf5ee35692bf6bd3cd4ec534cd70b30a6a93e3edc"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "source type does not match acquisition method"
+    },
+    {
+      "id": "aural-provenance/1/invalid-key-protection",
+      "source_case": "invalid-key-protection",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-key-protection.json",
+          "size": 1454,
+          "sha256": "a2a69b2ee3e534efaddd9fd423e089d3be22738a32335d6f8acf2abccb2ae309"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unsupported key-protection disclosure"
+    },
+    {
+      "id": "aural-provenance/1/invalid-acquiring-key",
+      "source_case": "invalid-acquiring-key",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-acquiring-key.json",
+          "size": 1445,
+          "sha256": "6beb38281c5934099d992605456c98c2139441a45adbc0bb5f28ecdda61c68f5"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "acquiring key does not equal signing key"
+    },
+    {
+      "id": "aural-provenance/1/invalid-subject-manifest",
+      "source_case": "invalid-subject-manifest",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-subject-manifest.json",
+          "size": 1445,
+          "sha256": "ebcc31ff0cc6cff83488726f92505a94dcd9c8aa54cee099354fd5d6fdabf4b1"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "manifest digest does not match package"
+    },
+    {
+      "id": "aural-provenance/1/invalid-subject-original",
+      "source_case": "invalid-subject-original",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-subject-original.json",
+          "size": 1445,
+          "sha256": "3d49c5e8d59a6379933a30c3209e698bfc1b9f6ef80b7fb19ee0210aaae2e85a"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "original digest does not match package"
+    },
+    {
+      "id": "aural-provenance/1/invalid-subject-length",
+      "source_case": "invalid-subject-length",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-subject-length.json",
+          "size": 1445,
+          "sha256": "0f19e45381855aaaa3b234cfca26a0d73604f565ceae06d96507b667ecadf823"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "original length does not match package"
+    },
+    {
+      "id": "aural-provenance/1/invalid-parent-self",
+      "source_case": "invalid-parent-self",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-parent-self.json",
+          "size": 1626,
+          "sha256": "c6e2be497a62d13870ac5b04fefd5b9f21ddafbcb6361e4a7395455ef6824789"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "event references itself as a parent"
+    },
+    {
+      "id": "aural-provenance/1/invalid-parent-duplicate",
+      "source_case": "invalid-parent-duplicate",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-parent-duplicate.json",
+          "size": 1808,
+          "sha256": "2b6185abef06a1ec92825774ef004c3732fd767cb1800711f4f62a1d1da6b17a"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "duplicate parent event identifier"
+    },
+    {
+      "id": "aural-provenance/1/invalid-parent-order",
+      "source_case": "invalid-parent-order",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-parent-order.json",
+          "size": 1808,
+          "sha256": "8479044c35baa23ffab71d3a50ebfd3f7b2deca555b319b9023f29b66b07a45c"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "parent array is not sorted"
+    },
+    {
+      "id": "aural-provenance/1/invalid-parent-digest",
+      "source_case": "invalid-parent-digest",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-parent-digest.json",
+          "size": 1624,
+          "sha256": "01ea7daa2bf9e96f371c56dcde6ef0c4ca002a754da951f2a287f3b6c96f4356"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "parent digest is not 32 bytes"
+    },
+    {
+      "id": "aural-provenance/1/invalid-parent-algorithm",
+      "source_case": "invalid-parent-algorithm",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-parent-algorithm.json",
+          "size": 1626,
+          "sha256": "c4e64d24aca18c3fea7a52901c8744309459a89f4f074270aef703c36f360611"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unknown parent digest algorithm"
+    },
+    {
+      "id": "aural-provenance/1/invalid-fraction",
+      "source_case": "invalid-fraction",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-fraction.json",
+          "size": 1447,
+          "sha256": "b466ab8cb024a46e2eea2525b8408118c9cc2a2ddda7d2670fcf71b42cca849b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "floating-point JSON number"
+    },
+    {
+      "id": "aural-provenance/1/invalid-unsafe-integer",
+      "source_case": "invalid-unsafe-integer",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-unsafe-integer.json",
+          "size": 1459,
+          "sha256": "70a19a8819e51609d05047cec4d0627acbc531b489fc4f79dfe877bdcfa0a96d"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "integer outside interoperable range"
+    },
+    {
+      "id": "aural-provenance/1/invalid-negative-zero",
+      "source_case": "invalid-negative-zero",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-negative-zero.json",
+          "size": 1445,
+          "sha256": "44b30c9969e556fae9c4df8ee221f9ec8eb0b56914cd98db7638079c4e5a857a"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "negative zero JSON token"
+    },
+    {
+      "id": "aural-provenance/1/invalid-unpaired-surrogate",
+      "source_case": "invalid-unpaired-surrogate",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-unpaired-surrogate.json",
+          "size": 1393,
+          "sha256": "35f6c1a8375d972b939138ae98c3311224bd26b4ff14953789cf02b3cf046461"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unpaired escaped surrogate"
+    },
+    {
+      "id": "aural-provenance/1/invalid-noncharacter",
+      "source_case": "invalid-noncharacter",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-noncharacter.json",
+          "size": 1393,
+          "sha256": "bd9722842327687ca1047dcf54df7f950936ee31d96f47d58ce2c9945d81142d"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "Unicode noncharacter"
+    },
+    {
+      "id": "aural-provenance/1/invalid-excessive-depth",
+      "source_case": "invalid-excessive-depth",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-excessive-depth.json",
+          "size": 1548,
+          "sha256": "88490e1fc7d752d34fa57b0227b7835fd9288bf5131ed11aecc7d0b42b1963e2"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "complete record exceeds maximum JSON nesting depth"
+    },
+    {
+      "id": "aural-provenance/1/invalid-key-id",
+      "source_case": "invalid-key-id",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-key-id.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-id.json",
+          "size": 242,
+          "sha256": "ef22519a81ff5fe48393df5f788fd877701b0ed04e87b1bdb43c735f90ab7304"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "key_id does not match public key"
+    },
+    {
+      "id": "aural-provenance/1/invalid-key-encoding",
+      "source_case": "invalid-key-encoding",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-key-encoding.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-encoding.json",
+          "size": 243,
+          "sha256": "7f421e14ba755ad33aecf8491c1e4d6a38157339f0534141e3650775c9fa7673"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "padded public-key base64url"
+    },
+    {
+      "id": "aural-provenance/1/invalid-key-unknown-member",
+      "source_case": "invalid-key-unknown-member",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-key-unknown-member.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-unknown-member.json",
+          "size": 280,
+          "sha256": "afe7f9cc75e975f39bdb8d676aac37674a4ec9b872963e50344aeedd65fb198e"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unknown public-key core member"
+    },
+    {
+      "id": "aural-provenance/1/invalid-key-algorithm",
+      "source_case": "invalid-key-algorithm",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-key-algorithm.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-algorithm.json",
+          "size": 240,
+          "sha256": "7c7507488381516b784ac7fc4382d7f2a451ca9f3587f31cbe0a682690e3b085"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "unsupported public-key algorithm"
+    },
+    {
+      "id": "aural-provenance/1/invalid-public-key-small-order",
+      "source_case": "invalid-public-key-small-order",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-public-key-small-order.json",
+          "size": 1445,
+          "sha256": "906e7bd7fea81db877d79f0ce21bb13aaa75923cf2523ed6471fc1a1ef89e7c2"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/key-invalid-small-order.json",
+          "size": 242,
+          "sha256": "03a175f940aaf2b121f8b789c60927c94ce7ca4f36582403996ac08d6bd8e56d"
+        },
+        {
+          "order": 2,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "identity public key and identity-R forgery"
+    },
+    {
+      "id": "aural-provenance/1/invalid-duplicate-key-record",
+      "source_case": "invalid-duplicate-key-record",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-duplicate-key-record.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 2,
+          "role": "public-key-record",
+          "path": "provenance/valid-key.json",
+          "size": 242,
+          "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+        },
+        {
+          "order": 3,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "duplicate key_id in supplied key records"
+    },
+    {
+      "id": "aural-provenance/1/invalid-missing-key-record",
+      "source_case": "invalid-missing-key-record",
+      "applicable_profile": {
+        "id": "org.aural.signature.ed25519-jcs-v1",
+        "version": "1"
+      },
+      "status": "required",
+      "inputs": [
+        {
+          "order": 0,
+          "role": "signed-event",
+          "path": "provenance/invalid-missing-key-record.json",
+          "size": 1445,
+          "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+        },
+        {
+          "order": 1,
+          "role": "subject-package",
+          "path": "conformance/valid-unicode.aural",
+          "size": 690,
+          "sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85"
+        }
+      ],
+      "expected": {
+        "outcome": "reject"
+      },
+      "informative_reason": "no supplied key matches signing_key_id"
+    }
+  ],
+  "ed25519_vectors": {
+    "signature_policy": "canonical points; reject small-order A and R; S < L; uncofactored equation",
+    "source_file": {
+      "role": "ed25519-vector-set",
+      "path": "provenance/ed25519-adversarial.json",
+      "size": 5974,
+      "sha256": "0372f31d62166fa0c998aedc93420738babcbacd166eb028f96d51bf01b4d515"
+    },
+    "records": [
+      {
+        "id": "aural-ed25519-policy/1/identity-key-identity-r",
+        "source_record": "identity-key-identity-r",
+        "json_pointer": "/vectors/0",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/small-a-small-r",
+        "source_record": "small-a-small-r",
+        "json_pointer": "/vectors/1",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/small-a-mixed-r",
+        "source_record": "small-a-mixed-r",
+        "json_pointer": "/vectors/2",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/mixed-a-small-r",
+        "source_record": "mixed-a-small-r",
+        "json_pointer": "/vectors/3",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/mixed-a-mixed-r-uncofactored",
+        "source_record": "mixed-a-mixed-r-uncofactored",
+        "json_pointer": "/vectors/4",
+        "expected": {
+          "outcome": "accept"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/cofactored-only",
+        "source_record": "cofactored-only",
+        "json_pointer": "/vectors/5",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/cofactored-prereduced",
+        "source_record": "cofactored-prereduced",
+        "json_pointer": "/vectors/6",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/scalar-l-plus",
+        "source_record": "scalar-l-plus",
+        "json_pointer": "/vectors/7",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/scalar-high",
+        "source_record": "scalar-high",
+        "json_pointer": "/vectors/8",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/noncanonical-r-reduced-hash",
+        "source_record": "noncanonical-r-reduced-hash",
+        "json_pointer": "/vectors/9",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/noncanonical-r-wire-hash",
+        "source_record": "noncanonical-r-wire-hash",
+        "json_pointer": "/vectors/10",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/noncanonical-a-reduced-hash",
+        "source_record": "noncanonical-a-reduced-hash",
+        "json_pointer": "/vectors/11",
+        "expected": {
+          "outcome": "reject"
+        }
+      },
+      {
+        "id": "aural-ed25519-policy/1/noncanonical-a-wire-hash",
+        "source_record": "noncanonical-a-wire-hash",
+        "json_pointer": "/vectors/12",
+        "expected": {
+          "outcome": "reject"
+        }
+      }
+    ]
+  }
+}

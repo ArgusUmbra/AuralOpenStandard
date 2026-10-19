@@ -21,7 +21,7 @@ node interop\validate_provenance.mjs `
   tests\fixtures\conformance\valid-unicode.aural
 ```
 
-Regeneration MUST leave all bytes and hashes unchanged unless the experimental profile and corpus are intentionally revised together. `expected.json` is the machine-readable case list and SHA-256 index. Its `files_sha256` object names every other regular file in the provenance corpus, including invalid key records and the primitive adversarial vectors; `expected.json` necessarily cannot contain its own digest. Tests require exact inventory equality, so a missing index entry, an unexpected file, or altered bytes fail conformance.
+Regeneration MUST leave all generated fixture bytes and hashes unchanged unless the experimental profile and corpus are intentionally revised together. `expected.json` is the generator-owned case list and SHA-256 index. Its `files_sha256` object names every generated fixture payload, including invalid key records and the primitive adversarial vectors; `expected.json` necessarily cannot contain its own digest. The separately maintained public manifest, `provenance-cases.v1.json`, is metadata and is not part of that generator-owned payload inventory. Tests require exact generated-payload inventory equality, so a missing index entry, an unexpected generated payload, or altered bytes fail conformance.
 
 ## Golden verification vector
 

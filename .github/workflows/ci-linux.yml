@@ -79,6 +79,9 @@ jobs:
       - name: Validate public Core Reader conformance manifest
         run: python tools/validate_core_conformance_manifest.py
 
+      - name: Validate public provenance conformance manifest
+        run: python tools/validate_provenance_conformance_manifest.py
+
       - name: Run Python test suite
         run: python -W error -m unittest discover -s tests -v
 
