@@ -76,6 +76,9 @@ jobs:
               raise SystemExit(1)
           PY
 
+      - name: Validate public Core Reader conformance manifest
+        run: python tools/validate_core_conformance_manifest.py
+
       - name: Run Python test suite
         run: python -W error -m unittest discover -s tests -v
 
