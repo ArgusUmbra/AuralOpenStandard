@@ -36,8 +36,52 @@ jobs:
       - name: Install Python dependency
         run: python -m pip install cryptography==50.0.1
 
+      - name: Enforce mandatory POSIX security tests
+        run: |
+          python - <<'PY'
+          import sys
+          import unittest
+
+          test_names = (
+              'tests.test_provenance.ProvenanceSignatureTests.test_node_readers_reject_fifo_without_blocking',
+              'tests.test_provenance.ProvenanceSignatureTests.test_node_readers_reject_symlinks_where_supported',
+              'tests.test_provenance_foundations.ProvenanceFoundationTests.test_actual_fifo_is_rejected_without_opening',
+              'tests.test_provenance_foundations.ProvenanceFoundationTests.test_actual_symlink_paths_are_rejected_where_supported',
+              'tests.test_graph_aggregate_byte_limit.GraphAggregateGeneratorSafetyTests.test_rejects_symlink_or_junction_redirection_when_supported',
+          )
+          expected_test_count = 5
+          if len(test_names) != expected_test_count:
+              print(
+                  f'ERROR: configured {len(test_names)} mandatory tests; '
+                  f'expected {expected_test_count}',
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+          suite = unittest.defaultTestLoader.loadTestsFromNames(test_names)
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if result.testsRun != expected_test_count:
+              print(
+                  f'ERROR: expected {expected_test_count} mandatory tests, '
+                  f'but executed {result.testsRun}',
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+          if result.skipped:
+              print(
+                  f'ERROR: {len(result.skipped)} mandatory test(s) skipped',
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+          if not result.wasSuccessful():
+              raise SystemExit(1)
+          PY
+
       - name: Run Python test suite
         run: python -W error -m unittest discover -s tests -v
 
       - name: Run Node graph test suite
         run: node --test tests/test_node_provenance_graph.mjs
+
+      - name: Check provenance fixture integrity
+        if: always()
+        run: git diff --exit-code -- tests/fixtures/provenance
