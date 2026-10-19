@@ -30,7 +30,7 @@ It does not define a graph container or graph manifest. Input ordering has no ev
 
 ## 2. Behavior-to-specification matrix
 
-The source references in this table identify behavior at baseline commit `63bd5d8e4d2934099cbab188d214a20cb8432472`. “Existing requirement” refers to the individual signed-event specification, not merely to implementation agreement.
+The source references in this table identify the graph implementation baseline at commit `63bd5d8e4d2934099cbab188d214a20cb8432472`; the diagnostic-policy rows reflect the active N17–N22 conformance state described in Section 14. “Existing requirement” refers to the individual signed-event specification, not merely to implementation agreement.
 
 | Behavior | Python behavior | Node.js behavior | Existing requirement | Disposition in this profile |
 |---|---|---|---|---|
@@ -57,8 +57,8 @@ The source references in this table identify behavior at baseline commit `63bd5d
 | Valid record sets with different `evidence_id` values may be structurally resolved | No cross-event check | No cross-event check | No graph policy | **OPEN DESIGN DECISION** |
 | Parent and child may name different six-field subjects when no package is supplied | No cross-event check | No cross-event check | No graph policy | **OPEN DESIGN DECISION** |
 | Competing malformed event records covered by the digest/bytes ordering rule are selected independently of input order | Digest/bytes ordering | Digest/bytes ordering | Independent checks may be reordered | Normative only where Section 11 expressly defines it |
-| Padded or otherwise noncanonical signature text is classified at the same stage | Classified later during signature processing | Classified during record validation | Rejection required; stage unspecified | **OPEN DESIGN DECISION** |
-| Competing malformed key records select the same failure independently of key input order | Key records are deterministically sorted during resolution | First malformed key input wins | Rejection required; precedence unspecified | **OPEN DESIGN DECISION** |
+| Padded or otherwise noncanonical signature text is classified at the same stage | Validated before graph resolution as `encoding` at the `record` stage | Validated before graph resolution as `encoding` at the `record` stage | Rejection required; stage previously unspecified | **APPROVED AND IMPLEMENTED DIAGNOSTIC POLICY:** actively enforced by N17–N19 |
+| Competing malformed key records select the same failure independently of key input order | Bounded raw graph key records are sorted by `(SHA-256(raw bytes), raw bytes)` before validation | Bounded raw graph key records are sorted by `(SHA-256(raw bytes), raw bytes)` before validation | Rejection required; precedence previously unspecified | **APPROVED AND IMPLEMENTED DIAGNOSTIC POLICY:** actively enforced by N20–N22 |
 | Fanout failure precedes or follows missing-parent and parent-digest-mismatch failures | Checked per event with parent resolution | All fanout checked before parent resolution | Rejection required; precedence unspecified | **OPEN DESIGN DECISION** |
 | Result property spelling | Python aggregate names use snake case | Node aggregate names use camel case | No serialized graph result format | Intentional language-specific API behavior |
 | Package verification call shape | Synchronous | Promise only when package verification is requested; detailed API is asynchronous | No graph API specified | Intentional language-specific API behavior |
@@ -139,7 +139,7 @@ To make malformed-record selection independent of input order, a verifier MUST c
 1. lowercase signed-event digest text; then
 2. raw record bytes.
 
-Each candidate MUST then pass the individual profile's UTF-8, canonical JSON, closed-schema, identifier, subject, parent-reference, and other pre-graph semantic checks. The point at which canonical signature-text encoding is classified remains provisional under Section 11.2. After the applicable record validation, logical candidates MUST be ordered by:
+Each candidate MUST then pass the individual profile's UTF-8, canonical JSON, closed-schema, identifier, subject, parent-reference, canonical signature-text encoding, and other pre-graph semantic checks. Canonical signature-text encoding is classified according to the approved policy in Section 11.2. After the applicable record validation, logical candidates MUST be ordered by:
 
 1. ASCII `event_id`;
 2. signed-event digest; then
@@ -198,13 +198,13 @@ For compatibility with the current experimental implementations, unequal cross-e
 
 ## 10. Verification pipeline
 
-Subject to the unresolved error-classification and competing-error cases in Section 11, complete verification MUST apply these conceptual stages. This list defines required acceptance dependencies, not a total cross-language order for independent checks or competing failures:
+Subject to the unresolved competing-error cases in Section 11, complete verification MUST apply these conceptual stages. This list defines required acceptance dependencies, not a total cross-language order for independent checks or competing failures:
 
 1. validate options and raw event/key input bounds;
-2. deterministically parse each signed-event record and apply the pre-graph checks defined in Section 7.1;
+2. deterministically parse each signed-event record and apply the pre-graph checks defined in Section 7.1, including canonical base64url validation of signature text;
 3. build the logical index, reject collisions, and count duplicates;
 4. resolve exact parent references, reject cycles, enforce graph limits, and produce parent-first order;
-5. validate every public-key record and reject duplicate key IDs;
+5. order the bounded raw public-key records by ascending `(SHA-256(raw bytes), raw bytes)`, validate every record in that order, and reject duplicate key IDs;
 6. verify the signature of every unique logical event in parent-first order; and
 7. if a package was supplied, independently verify it and bind every unique logical event to it.
 
@@ -231,17 +231,18 @@ Only the following precedence is established:
 
 - raw input bounds precede deduplication and all content checks;
 - the pre-graph record checks defined in Section 7.1 precede graph collision and structure checks;
+- canonical base64url signature-text failure is `encoding` at the `record` stage and precedes graph resolution;
 - graph resolution precedes public-key and signature verification;
-- key validation precedes signature verification;
+- bounded raw public-key records are ordered by ascending `(SHA-256(raw bytes), raw bytes)` before key validation, and key validation precedes signature verification;
 - all signature verification precedes optional package verification;
 - a cycle result precedes a graph-depth result; and
 - for event-record failures governed by the digest/raw-byte ordering in Section 7.1, the same input records in different sequence orders MUST select the same failure.
 
-### 11.2 Unresolved competing errors
+### 11.2 Approved and unresolved diagnostic precedence
 
-**OPEN DESIGN DECISION — signature text:** Python presently detects some noncanonical signature encodings during the signature stage, after graph resolution, while Node.js detects them during record validation. Rejection is required, and an isolated malformed canonical signature encoding has category `encoding`; whether its stage is `record` or `signature` remains provisional. A revision must assign this condition to one stage and define its precedence against structural graph failures. Until resolved, cross-language conformance claims must not assert stage agreement for this condition or precedence when it competes with another failure.
+**APPROVED AND IMPLEMENTED DIAGNOSTIC POLICY — signature text:** A signature string that is not canonical unpadded base64url for exactly 64 bytes MUST fail as category `encoding` at the `record` stage. This check is part of pre-graph record validation and MUST precede logical indexing and graph resolution, including `missing_parent` and `parent_digest_mismatch` failures. A canonical 64-byte signature that fails the Ed25519 acceptance policy remains category `signature` at the `signature` stage. Python and Node.js implement this classification, and active cross-language cases N17–N19 enforce it.
 
-**OPEN DESIGN DECISION — key ordering:** Python presently selects competing malformed-key failures using deterministic key ordering, while Node.js uses supplied key order. A revision must define a language-neutral key ordering and failure selection rule, or explicitly declare key-error selection order non-normative. Until resolved, cross-language conformance claims must exclude inputs containing multiple independently malformed key records when the exact selected category matters.
+**APPROVED AND IMPLEMENTED DIAGNOSTIC POLICY — key ordering:** After key count, individual key-record byte length, and aggregate key-record byte length have been bounded, a verifier MUST compute `SHA-256(raw bytes)` for each supplied public-key record and order the records by ascending digest bytes, breaking a digest tie by ascending raw bytes. It MUST validate every record in that order. Supplied sequence position therefore does not select among competing malformed-key failures. Sorting MUST NOT occur before the input bounds, weaken any bound, permit malformed unrelated keys to be ignored, or change duplicate-key rejection. The Python and Node.js graph verifiers implement this ordering, and active cross-language cases N20–N22 enforce it.
 
 **OPEN DESIGN DECISION — graph-structure precedence:** Python checks fanout, missing parents, and parent-digest mismatches together for each event in event-ID order. Node.js checks fanout for all events before resolving parent IDs and digests. Each isolated condition MUST be rejected with the category and graph stage specified in Section 11.1, but relative precedence among fanout, `missing_parent`, and `parent_digest_mismatch` is provisional when more than one is present.
 
@@ -306,7 +307,7 @@ Applications MUST keep `signature_valid`, package integrity, subject binding, si
 
 A conforming implementation of this experimental profile MUST implement the individual signed-event profile and the graph rules in this document. It MUST match the accept/reject outcomes and established machine-readable error expectations in the shared corpus at [graph conformance cases](../tests/fixtures/graph_conformance/cases.json).
 
-The ordinary corpus includes:
+The active ordinary corpus contains 35 cases and includes:
 
 - `A-signed-root-no-package` through `G-input-order-independence`;
 - signature, parent, package, archive, and public-key negatives `N01` through `N12`;
@@ -314,7 +315,10 @@ The ordinary corpus includes:
 - depth cases `I-graph-depth-256` and `N14-graph-depth-257`;
 - individual event byte cases `H-event-bytes-at-limit` and `N-event-bytes-over-limit`;
 - event count cases `H-event-count-4096` and `N-event-count-4097`; and
-- deterministic malformed-record cases `N15-competing-malformed-forward` and `N16-competing-malformed-reverse`.
+- deterministic malformed-record cases `N15-competing-malformed-forward` and `N16-competing-malformed-reverse`; and
+- signature-text and public-key-ordering diagnostics `N17-noncanonical-signature-encoding` through `N22-competing-malformed-keys-encoding-first`.
+
+Cases N17–N22 use independently pinned source fixtures and deterministic record construction. Their source and derived-record hashes, input construction, and expected diagnostics are part of the active manifest and are checked by both language adapters.
 
 The independently pinned cross-language adapter and expectations are in [the cross-language test](../tests/test_graph_cross_language.py) and [Node adapter](../tests/graph_conformance_node_adapter.mjs). The corpus manifest, compressed resource bundles, and package fixtures are integrity checked; regeneration is not part of a normal conformance run.
 
@@ -325,7 +329,7 @@ Aggregate event-byte conformance is defined separately by [aggregate-byte-limit-
 
 Those records are generated only in an operating-system temporary directory by the hardened generator referenced in the manifest. The suite is opt-in through `AURAL_RUN_LARGE_GRAPH_BOUNDARY=1`. A normal test run proves that the ordinary corpus and the aggregate harness's safety/inventory checks pass; it does not freshly prove either implementation at the 64 MiB aggregate boundary. An unqualified full resource-boundary conformance claim therefore requires a successful opt-in aggregate run or equivalent independently reproducible evidence.
 
-Expectations that intersect an **OPEN DESIGN DECISION** are provisional. Implementations MUST reject malformed input, but this revision requires identical category/stage outcomes only for isolated cases expressly specified as normative. It does not require identical stage selection for malformed signature encoding or identical selected failures for competing malformed keys, competing fanout/parent-resolution faults, or other same-stage combinations whose precedence Section 11 leaves open.
+The signature-text and public-key-ordering expectations approved in Section 11.2 are active normative diagnostic requirements represented by cases N17–N22. Competing fanout/parent-resolution faults and other same-stage combinations whose precedence Section 11 leaves open remain provisional. Implementations MUST reject malformed input and MUST match all established diagnostics in the 35-case active ordinary corpus.
 
 ## 15. Versioning and future compatibility
 

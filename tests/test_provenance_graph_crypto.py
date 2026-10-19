@@ -11,11 +11,16 @@ from tests._provenance_graph_helpers import signed_record
 
 
 FIXTURES = Path(__file__).parent / 'fixtures' / 'provenance'
+GRAPH_FIXTURES = Path(__file__).parent / 'fixtures' / 'graph_conformance'
 
 
 class ProvenanceGraphCryptographicTests(unittest.TestCase):
     def record(self, name):
         return (FIXTURES / name).read_bytes()
+
+    def padded_signature(self, raw):
+        self.assertTrue(raw.endswith(b'"}'))
+        return raw[:-2] + b'==' + raw[-2:]
 
     def assert_error(self, category, stage, records, keys, **kwargs):
         with self.assertRaises(provenance.ProvenanceVerificationError) as raised:
@@ -84,6 +89,34 @@ class ProvenanceGraphCryptographicTests(unittest.TestCase):
             provenance.ErrorCategory.SIGNATURE,
             provenance.VerificationStage.SIGNATURE,
             [self.record('invalid-signature.json')],
+            [self.record('valid-key.json')],
+        )
+
+    def test_noncanonical_signature_text_fails_during_record_validation(self):
+        self.assert_error(
+            provenance.ErrorCategory.ENCODING,
+            provenance.VerificationStage.RECORD,
+            [self.record('invalid-padded-signature.json')],
+            [self.record('valid-key.json')],
+        )
+
+    def test_noncanonical_signature_text_precedes_missing_parent(self):
+        child = self.padded_signature(self.record('valid-received-with-parent.json'))
+        self.assert_error(
+            provenance.ErrorCategory.ENCODING,
+            provenance.VerificationStage.RECORD,
+            [child],
+            [self.record('valid-key.json')],
+        )
+
+    def test_noncanonical_signature_text_precedes_parent_digest_mismatch(self):
+        child = self.padded_signature(
+            (GRAPH_FIXTURES / 'parent-digest-mismatch.json').read_bytes(),
+        )
+        self.assert_error(
+            provenance.ErrorCategory.ENCODING,
+            provenance.VerificationStage.RECORD,
+            [child, self.record('valid-original-acquired.json')],
             [self.record('valid-key.json')],
         )
 

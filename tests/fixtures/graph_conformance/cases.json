@@ -82,6 +82,36 @@
     "malformed_key": "../provenance/key-invalid-encoding.json",
     "incorrect_key_id": "../provenance/key-invalid-id.json"
   },
+  "diagnostic_inputs": {
+    "invalid_padded_signature": {
+      "path": "../provenance/invalid-padded-signature.json",
+      "sha256": "8427d640d16c16315352e02b59217f9e4f026cd14d043793e0b006413237bbb7"
+    },
+    "valid_received_with_parent": {
+      "path": "../provenance/valid-received-with-parent.json",
+      "sha256": "ae11fac3a420a5dd24d24e52443f22d565b1fc71a12b839d330b8595dcced2d3"
+    },
+    "parent_digest_mismatch": {
+      "path": "parent-digest-mismatch.json",
+      "sha256": "d96c419647e3a0757c3a7b63894dc79da676372322975c1a867a5975f72ba202"
+    },
+    "valid_root": {
+      "path": "../provenance/valid-original-acquired.json",
+      "sha256": "81d6ca95ac7a352155dd2f6b921b69e47a156bda4cd8ab8c2019c534794a708b"
+    },
+    "valid_key": {
+      "path": "../provenance/valid-key.json",
+      "sha256": "fea2167d922cbf64bf3a2982a366e7bfeeeb6e0a7e9c9710ae91845023df9609"
+    },
+    "invalid_key_algorithm": {
+      "path": "../provenance/key-invalid-algorithm.json",
+      "sha256": "7c7507488381516b784ac7fc4382d7f2a451ca9f3587f31cbe0a682690e3b085"
+    },
+    "invalid_key_encoding": {
+      "path": "../provenance/key-invalid-encoding.json",
+      "sha256": "7f421e14ba755ad33aecf8491c1e4d6a38157339f0534141e3650775c9fa7673"
+    }
+  },
   "packages": {
     "matching": {
       "path": "../conformance/valid-unicode.aural",
@@ -612,6 +642,118 @@
         "error": {
           "category": "canonicalization",
           "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "N17-noncanonical-signature-encoding",
+      "purpose": "Noncanonical padded signature text is rejected during pre-graph record validation.",
+      "diagnostic_input_construction": {
+        "signed_events": [
+          {"input": "invalid_padded_signature"}
+        ],
+        "public_keys": ["valid_key"]
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "encoding",
+          "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "N18-noncanonical-signature-with-missing-parent",
+      "purpose": "Noncanonical signature text is rejected before a competing missing-parent failure.",
+      "diagnostic_input_construction": {
+        "signed_events": [
+          {
+            "input": "valid_received_with_parent",
+            "transform": {"type": "append_signature_text", "suffix": "=="},
+            "sha256": "383e7f6e800f1f2189415bba6f339daade83169e1545d82d797ca60f0fffbfd0"
+          }
+        ],
+        "public_keys": ["valid_key"]
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "encoding",
+          "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "N19-noncanonical-signature-with-parent-digest-mismatch",
+      "purpose": "Noncanonical signature text is rejected before a competing parent-digest mismatch.",
+      "diagnostic_input_construction": {
+        "signed_events": [
+          {
+            "input": "parent_digest_mismatch",
+            "transform": {"type": "append_signature_text", "suffix": "=="},
+            "sha256": "d378462a4c60da9bf9a44d9dfaabba0bf27870bd959b40effda06f5fdb848a79"
+          },
+          {"input": "valid_root"}
+        ],
+        "public_keys": ["valid_key"]
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "encoding",
+          "stage": "record"
+        }
+      }
+    },
+    {
+      "id": "N20-invalid-public-key-algorithm",
+      "purpose": "A public-key record with an unsupported algorithm is rejected at the key stage.",
+      "diagnostic_input_construction": {
+        "signed_events": [
+          {"input": "valid_root"}
+        ],
+        "public_keys": ["invalid_key_algorithm"]
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "unsupported_algorithm",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "N21-competing-malformed-keys-algorithm-first",
+      "purpose": "Competing malformed keys select the digest-ordered unsupported-algorithm failure in algorithm-first caller order.",
+      "diagnostic_input_construction": {
+        "signed_events": [
+          {"input": "valid_root"}
+        ],
+        "public_keys": ["invalid_key_algorithm", "invalid_key_encoding"]
+      },
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "unsupported_algorithm",
+          "stage": "key"
+        }
+      }
+    },
+    {
+      "id": "N22-competing-malformed-keys-encoding-first",
+      "purpose": "Competing malformed keys select the same digest-ordered failure in reversed caller order.",
+      "diagnostic_input_construction": {
+        "signed_events": [
+          {"input": "valid_root"}
+        ],
+        "public_keys": ["invalid_key_encoding", "invalid_key_algorithm"]
+      },
+      "equivalent_to": "N21-competing-malformed-keys-algorithm-first",
+      "expected": {
+        "accepted": false,
+        "error": {
+          "category": "unsupported_algorithm",
+          "stage": "key"
         }
       }
     }

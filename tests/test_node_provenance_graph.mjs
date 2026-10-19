@@ -429,7 +429,7 @@ test('rejects a wrong supplied public key', async () => {
   );
 });
 
-test('rejects a malformed public-key record', async () => {
+test('rejects an isolated invalid-encoding public-key record', async () => {
   const [record, malformedKey] = await Promise.all([
     fixture('valid-original-acquired.json'),
     fixture('key-invalid-encoding.json'),
@@ -438,6 +438,34 @@ test('rejects a malformed public-key record', async () => {
     () => verifySignedEventGraph([record], [malformedKey]),
     expectError('encoding', 'key'),
   );
+});
+
+test('rejects an isolated invalid-algorithm public-key record', async () => {
+  const [record, malformedKey] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('key-invalid-algorithm.json'),
+  ]);
+  assert.throws(
+    () => verifySignedEventGraph([record], [malformedKey]),
+    expectError('unsupported_algorithm', 'key'),
+  );
+});
+
+test('orders competing malformed public-key records independently of input order', async () => {
+  const [record, invalidAlgorithm, invalidEncoding] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('key-invalid-algorithm.json'),
+    fixture('key-invalid-encoding.json'),
+  ]);
+  for (const keys of [
+    [invalidAlgorithm, invalidEncoding],
+    [invalidEncoding, invalidAlgorithm],
+  ]) {
+    assert.throws(
+      () => verifySignedEventGraph([record], keys),
+      expectError('unsupported_algorithm', 'key'),
+    );
+  }
 });
 
 test('rejects duplicate public-key identifiers, including identical key records', async () => {
@@ -570,6 +598,22 @@ test('existing individual-event verifier behavior remains signature-only', async
   assert.throws(
     () => verifySignedEvent(invalid, [key]),
     error => error?.category === 'signature',
+  );
+});
+
+test('individual-event verification preserves supplied malformed-key order', async () => {
+  const [record, invalidAlgorithm, invalidEncoding] = await Promise.all([
+    fixture('valid-original-acquired.json'),
+    fixture('key-invalid-algorithm.json'),
+    fixture('key-invalid-encoding.json'),
+  ]);
+  assert.throws(
+    () => verifySignedEvent(record, [invalidAlgorithm, invalidEncoding]),
+    error => error?.category === 'unsupported_algorithm',
+  );
+  assert.throws(
+    () => verifySignedEvent(record, [invalidEncoding, invalidAlgorithm]),
+    error => error?.category === 'encoding',
   );
 });
 

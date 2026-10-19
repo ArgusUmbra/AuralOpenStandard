@@ -1,4 +1,5 @@
 import base64
+import copy
 import gzip
 import hashlib
 import json
@@ -16,6 +17,33 @@ from aural import provenance
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / 'tests' / 'fixtures' / 'graph_conformance' / 'cases.json'
 NODE_ADAPTER = ROOT / 'tests' / 'graph_conformance_node_adapter.mjs'
+ACTIVE_CASE_COUNT = 35
+ORIGINAL_CASE_COUNT = 29
+ORIGINAL_CASES_SHA256 = 'c9c36493acc1ff6899ecf57c3be2f8b6f86aa4a72aac37101bdb4fdef2d0f0e0'
+REQUIRED_DIAGNOSTIC_CASE_IDS = frozenset({
+    'N17-noncanonical-signature-encoding',
+    'N18-noncanonical-signature-with-missing-parent',
+    'N19-noncanonical-signature-with-parent-digest-mismatch',
+    'N20-invalid-public-key-algorithm',
+    'N21-competing-malformed-keys-algorithm-first',
+    'N22-competing-malformed-keys-encoding-first',
+})
+EXPECTED_DIAGNOSTICS = {
+    'N17-noncanonical-signature-encoding': ('encoding', 'record'),
+    'N18-noncanonical-signature-with-missing-parent': ('encoding', 'record'),
+    'N19-noncanonical-signature-with-parent-digest-mismatch': ('encoding', 'record'),
+    'N20-invalid-public-key-algorithm': ('unsupported_algorithm', 'key'),
+    'N21-competing-malformed-keys-algorithm-first': ('unsupported_algorithm', 'key'),
+    'N22-competing-malformed-keys-encoding-first': ('unsupported_algorithm', 'key'),
+}
+EXPECTED_DERIVED_SHA256 = {
+    'N18-noncanonical-signature-with-missing-parent': (
+        '383e7f6e800f1f2189415bba6f339daade83169e1545d82d797ca60f0fffbfd0'
+    ),
+    'N19-noncanonical-signature-with-parent-digest-mismatch': (
+        'd378462a4c60da9bf9a44d9dfaabba0bf27870bd959b40effda06f5fdb848a79'
+    ),
+}
 REQUIRED_POSITIVE_CASE_IDS = frozenset({
     'A-signed-root-no-package',
     'B-signed-root-matching-package',
@@ -53,6 +81,7 @@ REQUIRED_RESOURCE_CASE_IDS = frozenset({
 })
 REQUIRED_CASE_IDS = (
     REQUIRED_POSITIVE_CASE_IDS | REQUIRED_NEGATIVE_CASE_IDS | REQUIRED_RESOURCE_CASE_IDS
+    | REQUIRED_DIAGNOSTIC_CASE_IDS
 )
 SIGNED_EVENT_DIGEST_DOMAIN = b'AURAL-SIGNED-EVENT-V1\0'
 
@@ -130,6 +159,111 @@ def validate_case_inventory(cases):
         raise AssertionError(
             'invalid graph-conformance case inventory; ' + '; '.join(problems),
         )
+
+
+def canonical_case_inventory_sha256(cases):
+    encoded = json.dumps(
+        cases, ensure_ascii=False, separators=(',', ':'), sort_keys=True,
+    ).encode('utf-8')
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_diagnostic_case_definitions(manifest):
+    cases = manifest['cases']
+    if len(cases) != ACTIVE_CASE_COUNT:
+        raise AssertionError(f'active graph-conformance inventory must contain 35 cases')
+    if canonical_case_inventory_sha256(cases[:ORIGINAL_CASE_COUNT]) \
+            != ORIGINAL_CASES_SHA256:
+        raise AssertionError('original 29 active graph cases changed during promotion')
+
+    inputs = manifest.get('diagnostic_inputs')
+    if not isinstance(inputs, dict) or not inputs:
+        raise AssertionError('diagnostic inputs must be a nonempty object')
+    cases_by_id = {test_case['id']: test_case for test_case in cases}
+    for case_id in REQUIRED_DIAGNOSTIC_CASE_IDS:
+        test_case = cases_by_id[case_id]
+        construction = test_case.get('diagnostic_input_construction')
+        if not isinstance(construction, dict):
+            raise AssertionError(f'{case_id}: missing diagnostic input construction')
+        events = construction.get('signed_events')
+        keys = construction.get('public_keys')
+        if not isinstance(events, list) or not events \
+                or not isinstance(keys, list) or not keys:
+            raise AssertionError(f'{case_id}: incomplete diagnostic input construction')
+        aliases = [item.get('input') for item in events]
+        aliases.extend(keys)
+        unknown = sorted(set(aliases) - set(inputs))
+        if unknown:
+            raise AssertionError(f'{case_id}: unknown diagnostic inputs: {unknown}')
+
+        category, stage = EXPECTED_DIAGNOSTICS[case_id]
+        if test_case.get('expected') != {
+                'accepted': False,
+                'error': {'category': category, 'stage': stage}}:
+            raise AssertionError(f'{case_id}: active diagnostic expectation is not pinned')
+
+    for case_id, expected_sha256 in EXPECTED_DERIVED_SHA256.items():
+        descriptor = cases_by_id[case_id]['diagnostic_input_construction'][
+            'signed_events'
+        ][0]
+        if descriptor.get('sha256') != expected_sha256:
+            raise AssertionError(f'{case_id}: derived record SHA-256 pin changed')
+    if cases_by_id['N01-invalid-ed25519-signature']['expected'] != {
+            'accepted': False,
+            'error': {'category': 'signature', 'stage': 'signature'}}:
+        raise AssertionError('N01 genuine Ed25519 diagnostic changed')
+
+
+def load_diagnostic_inputs(manifest, base):
+    inputs = {}
+    for alias, fixture in manifest['diagnostic_inputs'].items():
+        relative = Path(fixture['path'])
+        if relative.is_absolute():
+            raise AssertionError(f'{alias}: diagnostic fixture path must be relative')
+        raw = (base / relative).resolve().read_bytes()
+        if hashlib.sha256(raw).hexdigest() != fixture['sha256']:
+            raise AssertionError(f'{alias}: diagnostic fixture SHA-256 does not match pin')
+        inputs[alias] = raw
+    return inputs
+
+
+def construct_diagnostic_event(descriptor, inputs):
+    raw = inputs[descriptor['input']]
+    transform = descriptor.get('transform')
+    if transform is None:
+        return raw
+    if transform != {'type': 'append_signature_text', 'suffix': '=='}:
+        raise AssertionError(f"{descriptor['input']}: unsupported diagnostic transform")
+    if not raw.endswith(b'"}'):
+        raise AssertionError(f"{descriptor['input']}: unexpected canonical record ending")
+
+    document = json.loads(raw.decode('utf-8'))
+    if not isinstance(document.get('signature'), str):
+        raise AssertionError(f"{descriptor['input']}: signature is not a string")
+    document['signature'] += transform['suffix']
+    serialized = json.dumps(
+        document, ensure_ascii=False, separators=(',', ':'), sort_keys=True,
+    ).encode('utf-8')
+    directly_derived = raw[:-2] + transform['suffix'].encode('ascii') + raw[-2:]
+    if serialized != directly_derived:
+        raise AssertionError(
+            f"{descriptor['input']}: derived record did not preserve canonical JSON bytes",
+        )
+    if hashlib.sha256(serialized).hexdigest() != descriptor.get('sha256'):
+        raise AssertionError(
+            f"{descriptor['input']}: derived record SHA-256 does not match pending pin",
+        )
+    return serialized
+
+
+def diagnostic_case_inputs(test_case, inputs):
+    construction = test_case['diagnostic_input_construction']
+    records = [
+        construct_diagnostic_event(descriptor, inputs)
+        for descriptor in construction['signed_events']
+    ]
+    keys = [inputs[alias] for alias in construction['public_keys']]
+    return records, keys
 
 
 def enum_value(value):
@@ -219,7 +353,9 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         cls.base = MANIFEST.parent
         cls.cases = cls.manifest.get('cases')
         validate_case_inventory(cls.cases)
+        validate_diagnostic_case_definitions(cls.manifest)
         cls.events = cls.manifest['events']
+        cls.diagnostic_inputs = load_diagnostic_inputs(cls.manifest, cls.base)
         cls._python_case_results = {}
         cls._python_signature_claims = {}
         cls.bundles = {}
@@ -248,7 +384,9 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
         return (self.base / path).resolve()
 
     def case_inputs(self, test_case):
-        if 'resource_bundle' in test_case:
+        if 'diagnostic_input_construction' in test_case:
+            records, keys = diagnostic_case_inputs(test_case, self.diagnostic_inputs)
+        elif 'resource_bundle' in test_case:
             selection = test_case['resource_bundle']
             bundle = self.bundles[selection['bundle']]
             encoded = bundle['collections'][selection['collection']]
@@ -265,10 +403,11 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                 self.fixture_path(self.events[alias]['path']).read_bytes()
                 for alias in test_case['signed_events']
             ]
-        keys = [
-            self.fixture_path(self.manifest['public_keys'][alias]).read_bytes()
-            for alias in test_case['public_keys']
-        ]
+        if 'diagnostic_input_construction' not in test_case:
+            keys = [
+                self.fixture_path(self.manifest['public_keys'][alias]).read_bytes()
+                for alias in test_case['public_keys']
+            ]
         package = None
         package_sha256 = None
         if 'package' in test_case:
@@ -469,6 +608,70 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                 AssertionError, r"unexpected IDs: \['Z-unexpected-case'\]"):
             validate_case_inventory(cases)
 
+    def test_active_inventory_has_35_unique_cases(self):
+        case_ids = [test_case['id'] for test_case in self.cases]
+        self.assertEqual(ACTIVE_CASE_COUNT, len(case_ids))
+        self.assertEqual(ACTIVE_CASE_COUNT, len(set(case_ids)))
+        self.assertTrue(REQUIRED_DIAGNOSTIC_CASE_IDS.issubset(case_ids))
+
+    def test_inventory_rejects_each_missing_diagnostic_case(self):
+        for missing_id in sorted(REQUIRED_DIAGNOSTIC_CASE_IDS):
+            with self.subTest(case=missing_id):
+                cases = [
+                    test_case for test_case in self.cases
+                    if test_case['id'] != missing_id
+                ]
+                with self.assertRaisesRegex(AssertionError, 'missing IDs'):
+                    validate_case_inventory(cases)
+
+    def test_original_29_case_definitions_are_unchanged(self):
+        self.assertEqual(
+            ORIGINAL_CASES_SHA256,
+            canonical_case_inventory_sha256(self.cases[:ORIGINAL_CASE_COUNT]),
+        )
+
+    def test_diagnostic_source_hash_mismatch_is_rejected(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest['diagnostic_inputs']['valid_key']['sha256'] = '0' * 64
+        with self.assertRaisesRegex(AssertionError, 'does not match pin'):
+            load_diagnostic_inputs(manifest, self.base)
+
+    def test_derived_record_hash_mismatch_is_rejected(self):
+        manifest = copy.deepcopy(self.manifest)
+        test_case = next(
+            candidate for candidate in manifest['cases']
+            if candidate['id'] == (
+                'N18-noncanonical-signature-with-missing-parent'
+            )
+        )
+        test_case['diagnostic_input_construction']['signed_events'][0][
+            'sha256'
+        ] = '0' * 64
+        with self.assertRaisesRegex(AssertionError, 'derived record SHA-256 pin changed'):
+            validate_diagnostic_case_definitions(manifest)
+
+    def test_diagnostic_expectation_mismatch_is_rejected(self):
+        for field, value in (
+                ('category', 'signature'), ('stage', 'signature')):
+            with self.subTest(field=field):
+                manifest = copy.deepcopy(self.manifest)
+                test_case = next(
+                    candidate for candidate in manifest['cases']
+                    if candidate['id'] == 'N17-noncanonical-signature-encoding'
+                )
+                test_case['expected']['error'][field] = value
+                with self.assertRaisesRegex(AssertionError, 'expectation is not pinned'):
+                    validate_diagnostic_case_definitions(manifest)
+
+    def test_derived_diagnostic_records_match_pinned_hashes(self):
+        cases_by_id = {test_case['id']: test_case for test_case in self.cases}
+        for case_id, expected_sha256 in EXPECTED_DERIVED_SHA256.items():
+            with self.subTest(case=case_id):
+                records, _keys = diagnostic_case_inputs(
+                    cases_by_id[case_id], self.diagnostic_inputs,
+                )
+                self.assertEqual(expected_sha256, hashlib.sha256(records[0]).hexdigest())
+
     def test_python_results_match_independent_expectations(self):
         for test_case in self.cases:
             with self.subTest(case=test_case['id']):
@@ -530,6 +733,14 @@ class GraphCrossLanguageConformanceTests(unittest.TestCase):
                     node_case['event_input_sha256'],
                     f'{case_id}: verifier event input bytes differ',
                 )
+                if 'diagnostic_input_construction' in test_case:
+                    self.assertEqual(
+                        [base64.b64encode(raw).decode('ascii') for raw in records],
+                        node_case.get('diagnostic_event_input_base64'),
+                        f'{case_id}: derived event bytes differ across languages',
+                    )
+                else:
+                    self.assertNotIn('diagnostic_event_input_base64', node_case)
                 self.assertEqual(
                     [hashlib.sha256(raw).hexdigest() for raw in keys],
                     node_case['key_input_sha256'],

@@ -1,4 +1,6 @@
 // Bounded, deterministic signed-event graph verification for the AURAL profile.
+import { createHash } from 'node:crypto';
+
 import {
   createSignedEventVerifier,
   signedEventSha256,
@@ -169,6 +171,19 @@ function copyBoundedKeyInputs(records, limits) {
     copies.push(Buffer.from(record));
   }
   return copies;
+}
+
+function orderBoundedKeyInputs(records) {
+  return records
+    .map(record => ({
+      digest: createHash('sha256').update(record).digest(),
+      record,
+    }))
+    .sort((left, right) => (
+      Buffer.compare(left.digest, right.digest)
+        || Buffer.compare(left.record, right.record)
+    ))
+    .map(item => item.record);
 }
 
 function deepFreeze(value) {
@@ -566,10 +581,11 @@ function verifySignedEventGraphInternal(
   // accepts a caller-provided index, including one built through test seams.
   const index = indexWithDigest(records, limits.indexing, signedEventSha256);
   const resolved = resolveSignedEventGraphStructure(index, limits.resolution);
+  const orderedKeyRecords = orderBoundedKeyInputs(boundedKeyRecords);
 
   let verifier;
   try {
-    verifier = createSignedEventVerifier(boundedKeyRecords, {
+    verifier = createSignedEventVerifier(orderedKeyRecords, {
       ...limits.keys,
       maxRecord: limits.indexing.maxRecord,
     });

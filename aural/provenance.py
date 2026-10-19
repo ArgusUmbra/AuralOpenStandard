@@ -1214,6 +1214,9 @@ def _index_signed_event_records(records, limits=None):
     indexed = []
     for signed_event_sha256, record in ordered_records:
         validated = _parse_validate_record(record)
+        _canonical_base64url(
+            validated.document['signature'], 64, 'signature', VerificationStage.RECORD,
+        )
         indexed.append(_IndexedSignedRecord(
             record=record,
             validated=validated,

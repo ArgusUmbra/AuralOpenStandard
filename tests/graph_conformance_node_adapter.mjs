@@ -58,6 +58,49 @@ function fixturePath(base, relativePath) {
   return resolve(base, relativePath);
 }
 
+async function loadDiagnosticInputs(manifest, base) {
+  const inputs = new Map();
+  for (const [alias, fixture] of Object.entries(manifest.diagnostic_inputs ?? {})) {
+    const raw = await readFile(fixturePath(base, fixture.path));
+    if (sha256(raw) !== fixture.sha256) {
+      throw new Error(`${alias}: diagnostic fixture SHA-256 does not match manifest pin`);
+    }
+    inputs.set(alias, raw);
+  }
+  return inputs;
+}
+
+function constructDiagnosticEvent(descriptor, inputs) {
+  const source = inputs.get(descriptor.input);
+  if (source === undefined) throw new Error(`unknown diagnostic input: ${descriptor.input}`);
+  if (descriptor.transform === undefined) return source;
+  if (descriptor.transform?.type !== 'append_signature_text'
+      || descriptor.transform.suffix !== '==') {
+    throw new Error(`${descriptor.input}: unsupported diagnostic transform`);
+  }
+  if (source.subarray(-2).toString('utf8') !== '"}') {
+    throw new Error(`${descriptor.input}: unexpected canonical record ending`);
+  }
+  const document = JSON.parse(source.toString('utf8'));
+  if (typeof document.signature !== 'string') {
+    throw new Error(`${descriptor.input}: source signature is not a string`);
+  }
+  document.signature += descriptor.transform.suffix;
+  const serialized = Buffer.from(canonicalJson(document), 'utf8');
+  const directlyDerived = Buffer.concat([
+    source.subarray(0, -2),
+    Buffer.from(descriptor.transform.suffix, 'ascii'),
+    source.subarray(-2),
+  ]);
+  if (!serialized.equals(directlyDerived)) {
+    throw new Error(`${descriptor.input}: derived record is not byte-identical canonical JSON`);
+  }
+  if (sha256(serialized) !== descriptor.sha256) {
+    throw new Error(`${descriptor.input}: derived record SHA-256 does not match manifest pin`);
+  }
+  return serialized;
+}
+
 async function main() {
   if (process.argv.length !== 3) {
     throw new Error('usage: node tests/graph_conformance_node_adapter.mjs MANIFEST');
@@ -67,6 +110,7 @@ async function main() {
   const base = dirname(manifestPath);
   const cases = {};
   const bundles = {};
+  const diagnosticInputs = await loadDiagnosticInputs(manifest, base);
 
   for (const [alias, fixture] of Object.entries(manifest.bundles ?? {})) {
     const compressed = await readFile(fixturePath(base, fixture.path));
@@ -85,11 +129,19 @@ async function main() {
   }
 
   for (const testCase of manifest.cases) {
-    const keyPaths = testCase.public_keys.map(
-      alias => fixturePath(base, manifest.public_keys[alias]),
-    );
     let records;
-    if (testCase.resource_bundle !== undefined) {
+    let keys;
+    const diagnosticConstruction = testCase.diagnostic_input_construction;
+    if (diagnosticConstruction !== undefined) {
+      records = diagnosticConstruction.signed_events.map(
+        descriptor => constructDiagnosticEvent(descriptor, diagnosticInputs),
+      );
+      keys = diagnosticConstruction.public_keys.map(alias => {
+        const raw = diagnosticInputs.get(alias);
+        if (raw === undefined) throw new Error(`unknown diagnostic public key: ${alias}`);
+        return raw;
+      });
+    } else if (testCase.resource_bundle !== undefined) {
       const selection = testCase.resource_bundle;
       const encoded = bundles[selection.bundle].collections[selection.collection];
       if (!Array.isArray(encoded)) {
@@ -111,7 +163,12 @@ async function main() {
       );
       records = await Promise.all(eventPaths.map(path => readFile(path)));
     }
-    const keys = await Promise.all(keyPaths.map(path => readFile(path)));
+    if (keys === undefined) {
+      const keyPaths = testCase.public_keys.map(
+        alias => fixturePath(base, manifest.public_keys[alias]),
+      );
+      keys = await Promise.all(keyPaths.map(path => readFile(path)));
+    }
     const packageFixture = testCase.package === undefined
       ? undefined : manifest.packages[testCase.package];
     const packagePath = packageFixture === undefined
@@ -121,6 +178,11 @@ async function main() {
       event_input_sha256: records.map(sha256),
       key_input_sha256: keys.map(sha256),
     };
+    if (diagnosticConstruction !== undefined) {
+      evidence.diagnostic_event_input_base64 = records.map(
+        record => record.toString('base64'),
+      );
+    }
     const claims = testCase.claims ?? {};
     if (claims.input_event_count !== undefined) {
       evidence.input_event_count = records.length;
