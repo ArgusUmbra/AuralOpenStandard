@@ -110,7 +110,7 @@ The runner, not the adapter, compares observed and published outcomes. A negativ
 
 The overall required result is:
 
-- `PASS` only when all 30 required Draft 0.2 cases pass;
+- `PASS` only when all 33 required Draft 0.2 cases pass;
 - `FAIL` when all required cases execute but one or more return the wrong valid outcome;
 - `INCOMPLETE` when required inventory or execution coverage is missing, skipped, timed out, or erroneous.
 
@@ -134,9 +134,9 @@ The versioned JSON report identifies the exact manifest digest, profile, adapter
   },
   "optional_legacy_included": false,
   "summary": {
-    "required_cases": 30,
-    "selected_cases": 30,
-    "passed": 30,
+    "required_cases": 33,
+    "selected_cases": 33,
+    "passed": 33,
     "failed": 0,
     "skipped": 0,
     "execution_errors": 0,
@@ -168,7 +168,7 @@ The complete report also has `adapter`, `execution`, `generated_at`, nested requ
 
 The report output must be outside conformance fixture directories and cannot be a symbolic link. The runner writes it atomically. Treat adapters as trusted executable code: the runner is not a sandbox. It needs no network access itself, but it cannot prevent an adapter from using resources, including the network, that the operating system account permits.
 
-The current executable operation covers only Core Reader `verify-package`. Signed provenance, signed-event graphs, excerpt proofs, and acoustic reproduction need separate protocol revisions and are not supported merely because operation names are reserved. The Core corpus also excludes dynamically generated ZIP64 cases, writer coverage, large aggregate boundaries, side-channel analysis, key management, and the unlisted input space. Passing is useful evidence, not proof of correctness outside the published cases and not security certification.
+The current executable operation covers only Core Reader `verify-package`. Signed provenance, signed-event graphs, excerpt proofs, and acoustic reproduction need separate protocol revisions and are not supported merely because operation names are reserved. The Core corpus includes small archive-level ZIP64 necessity vectors but excludes large-file ZIP64 boundary cases, writer coverage, unrelated large aggregate boundaries, side-channel analysis, key management, and the unlisted input space. Passing is useful evidence, not proof of correctness outside the published cases and not security certification.
 
 ## Experimental Graph Verifier profile
 

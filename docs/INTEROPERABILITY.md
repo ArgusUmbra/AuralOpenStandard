@@ -9,7 +9,7 @@ Two independent implementations currently agree on the Draft 0.2 corpus:
 - the Python reference uses `zipfile` only after a manual raw-record preflight; and
 - `interop/validate_aural.mjs` is a dependency-free Node.js validator with its own bounded positional ZIP reader, CRC32 implementation, JCS validation, schema checks, streaming SHA-256 verification, and WAVE signature check.
 
-On Node.js 24.19.0 and Python 3.11.5, both implementations accept all four Draft 0.2 positive fixtures and reject all 26 Draft 0.2 negative fixtures. The Python implementation additionally accepts two Draft 0.1 fixtures through its separate legacy path. The Node validator intentionally supports only classic-size ZIP records and is therefore an independent validator, not yet a fully conformant general reader for ZIP64 packages.
+The Python and Node.js implementations both use bounded positional ZIP readers, resolve necessary archive-level ZIP64 metadata, reject redundant ZIP64 end records, and enforce necessity independently for entry-level ZIP64 extra fields. Against the public corpus, both accept all five Draft 0.2 positive fixtures and reject all 28 Draft 0.2 negative fixtures. The Python implementation additionally accepts two Draft 0.1 fixtures through its separate legacy path.
 
 The Node validator opens the pathname once, checks the resulting file handle's physical size before allocating archive-controlled buffers, reads the central directory under the 4 MiB bound, and streams audio in 1 MiB chunks. It compares file-handle metadata before and after validation so truncation, extension, or ordinary in-place modification produces a controlled failure; replacement of the pathname cannot switch the already-open validation object.
 

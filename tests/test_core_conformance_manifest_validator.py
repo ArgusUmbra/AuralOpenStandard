@@ -57,7 +57,7 @@ class CoreConformanceManifestValidatorTests(unittest.TestCase):
     def test_valid_committed_manifest_passes(self):
         completed = self.run_validator()
         self.assertEqual(0, completed.returncode, completed.stderr)
-        self.assertIn("validated 32 cases and 32 fixtures", completed.stdout)
+        self.assertIn("validated 35 cases and 35 fixtures", completed.stdout)
         self.assertIn("all sizes and SHA-256 digests match", completed.stdout)
 
     def test_modified_fixture_bytes_fail(self):
@@ -169,7 +169,7 @@ class CoreConformanceManifestValidatorTests(unittest.TestCase):
         document["cases"].pop()
         self.write_manifest(manifest, document)
         self.assert_validation_fails(
-            self.run_validator(manifest), "must contain exactly 32 cases"
+            self.run_validator(manifest), "must contain exactly 35 cases"
         )
 
     def test_informative_reason_is_not_a_diagnostic_code(self):

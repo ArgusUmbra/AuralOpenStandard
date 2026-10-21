@@ -75,6 +75,11 @@
       "outcome": "reject",
       "reason": "malformed local header signature"
     },
+    "invalid-missing-required-zip64-end.aural": {
+      "fixture_sha256": "fb6db3b8a5aa22d4a8bd15c6e764ad876188667500deadd46608f542f03c0368",
+      "outcome": "reject",
+      "reason": "classic EOCD sentinels require a ZIP64 EOCD and locator"
+    },
     "invalid-negative-zero.aural": {
       "fixture_sha256": "a93f986d8c3e2f99ed7e2d879575ca0158aa9c9a5295bd086c9a6ac621bb8a8c",
       "outcome": "reject",
@@ -89,6 +94,11 @@
       "fixture_sha256": "1bfe15553eadd4c83ffb4185c12e816d50fb5cfff0f9fd52a33d43837b19d5e2",
       "outcome": "reject",
       "reason": "I-JSON Unicode noncharacter"
+    },
+    "invalid-redundant-zip64-end.aural": {
+      "fixture_sha256": "4950711ac54d29564b437e38383c5aa69c4f7fed732ab2deb7b1394a76e1201d",
+      "outcome": "reject",
+      "reason": "ZIP64 EOCD and locator are prohibited without a classic EOCD sentinel"
     },
     "invalid-special-file.aural": {
       "fixture_sha256": "d4e8cc8e7c3f3e676662e5b42eb835692588177013402627f3b4182d4a6aab7a",
@@ -154,6 +164,11 @@
       "fixture_sha256": "aae82053118bedd4ab55c32322aeab7219ac2f4fced5847eee6d07215feda6a3",
       "outcome": "accept-0.2",
       "reason": "minimal canonical Draft 0.2 package"
+    },
+    "valid-required-zip64-end.aural": {
+      "fixture_sha256": "c4b2019336614e509388f04ddefeef5311052a3a81355892869c16bef621866b",
+      "outcome": "accept-0.2",
+      "reason": "ZIP64 EOCD and locator required by classic EOCD count sentinels"
     },
     "valid-unicode.aural": {
       "fixture_sha256": "61bc898ebcc547586c11bbfc2507b1111ce91342f5b49559789d1c2d052bbf85",

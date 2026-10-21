@@ -88,6 +88,35 @@ def write_raw_classic_package(path, entries, *, entry_comments=None):
     path.write_bytes(archive)
 
 
+def write_raw_zip64_end_package(path, entries, mode):
+    """Write a classic-entry package with a controlled ZIP64 end-record chain."""
+    if mode not in {'required', 'redundant', 'missing'}:
+        raise ValueError(f'unsupported ZIP64 end-record mode: {mode}')
+    write_raw_classic_package(path, entries)
+    classic = bytearray(path.read_bytes())
+    eocd = bytearray(classic[-22:])
+    body = classic[:-22]
+    central_size = struct.unpack_from('<I', eocd, 12)[0]
+    central_offset = struct.unpack_from('<I', eocd, 16)[0]
+    entry_count = struct.unpack_from('<H', eocd, 10)[0]
+
+    # Counts are the selected sentinel fields. Keeping classic size and offset
+    # non-sentinel exercises their required equality with the ZIP64 values.
+    if mode in {'required', 'missing'}:
+        struct.pack_into('<HH', eocd, 8, 0xffff, 0xffff)
+    if mode == 'missing':
+        path.write_bytes(body + eocd)
+        return
+
+    zip64_offset = len(body)
+    zip64_eocd = struct.pack(
+        '<IQHHIIQQQQ', 0x06064b50, 44, 45, 45, 0, 0,
+        entry_count, entry_count, central_size, central_offset,
+    )
+    locator = struct.pack('<IIQI', 0x07064b50, 0, zip64_offset, 1)
+    path.write_bytes(body + zip64_eocd + locator + eocd)
+
+
 def write_with_unnecessary_zip64_extra(path, entries):
     with zipfile.ZipFile(path, 'w', allowZip64=True) as archive:
         for name, data in entries:
@@ -132,6 +161,30 @@ def main():
     )
     add(expected, 'valid-independent.aural', 'accept-0.2',
         'independently assembled classic ZIP and literal canonical manifest')
+
+    write_raw_zip64_end_package(
+        OUT / 'valid-required-zip64-end.aural',
+        [('manifest.json', minimal_bytes), (AUDIO_NAME, audio)],
+        'required',
+    )
+    add(expected, 'valid-required-zip64-end.aural', 'accept-0.2',
+        'ZIP64 EOCD and locator required by classic EOCD count sentinels')
+
+    write_raw_zip64_end_package(
+        OUT / 'invalid-redundant-zip64-end.aural',
+        [('manifest.json', minimal_bytes), (AUDIO_NAME, audio)],
+        'redundant',
+    )
+    add(expected, 'invalid-redundant-zip64-end.aural', 'reject',
+        'ZIP64 EOCD and locator are prohibited without a classic EOCD sentinel')
+
+    write_raw_zip64_end_package(
+        OUT / 'invalid-missing-required-zip64-end.aural',
+        [('manifest.json', minimal_bytes), (AUDIO_NAME, audio)],
+        'missing',
+    )
+    add(expected, 'invalid-missing-required-zip64-end.aural', 'reject',
+        'classic EOCD sentinels require a ZIP64 EOCD and locator')
 
     unicode_doc = manifest(
         audio,

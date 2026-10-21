@@ -34,7 +34,8 @@ class NodeZip64Tests(unittest.TestCase):
         self.root = Path(self.temporary.name)
 
     def build_zip64(self, *, entry_zip64=False, partial_classic_eocd=False,
-                    duplicate_extra=False, unsupported_extra=False):
+                    redundant_end=False, duplicate_extra=False,
+                    unsupported_extra=False):
         local = bytearray()
         records = []
         for name, data in self.entries:
@@ -83,7 +84,12 @@ class NodeZip64Tests(unittest.TestCase):
             2, 2, len(central), central_offset,
         )
         archive += struct.pack('<IIQI', 0x07064b50, 0, zip64_offset, 1)
-        if partial_classic_eocd:
+        if redundant_end:
+            archive += struct.pack(
+                '<IHHHHIIH', 0x06054b50, 0, 0, 2, 2,
+                len(central), central_offset, 0,
+            )
+        elif partial_classic_eocd:
             archive += struct.pack(
                 '<IHHHHIIH', 0x06054b50, 0, 0, 2, 2,
                 0xffffffff, 0xffffffff, 0,
@@ -226,6 +232,8 @@ class NodeZip64Tests(unittest.TestCase):
         cases['duplicate-end-record'] = (
             original[:locator] + original[end64:end64 + 56] + original[locator:]
         )
+        cases['redundant-end-records'] = self.build_zip64(redundant_end=True)
+        cases['missing-required-end-records'] = original[:end64] + original[eocd:]
 
         for name, payload in cases.items():
             with self.subTest(case=name):

@@ -36,7 +36,7 @@ KIT_MANIFEST_VERSION = "1"
 PROFILE_ID = "aural-core-reader"
 PROFILE_VERSION = "0.2-draft"
 PROFILE_STATUS = "draft"
-REQUIRED_CASES = 30
+REQUIRED_CASES = 33
 OPTIONAL_CASES = 2
 TOTAL_CASES = REQUIRED_CASES + OPTIONAL_CASES
 
@@ -480,15 +480,15 @@ def validate_manifest(manifest_path: Path) -> ValidationSummary:
         counts[(status, outcome)] += 1
 
     expected_counts = {
-        ("required", "accept"): 4,
-        ("required", "reject"): 26,
+        ("required", "accept"): 5,
+        ("required", "reject"): 28,
         ("optional", "accept"): 2,
         ("optional", "reject"): 0,
     }
     if counts != expected_counts:
         raise ValidationError(
-            "case distribution mismatch: expected 30 required Draft 0.2 "
-            "(4 accept, 26 reject) and 2 accepted optional Draft 0.1 cases; "
+            "case distribution mismatch: expected 33 required Draft 0.2 "
+            "(5 accept, 28 reject) and 2 accepted optional Draft 0.1 cases; "
             f"got {counts}"
         )
 

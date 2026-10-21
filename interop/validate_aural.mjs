@@ -285,8 +285,14 @@ async function parseZip(reader) {
       fail('classic and ZIP64 end records disagree');
     }
     directoryEnd = zip64Offset;
-  } else if (disk !== 0 || centralDisk !== 0 || diskCount !== count) {
-    fail('multi-disk or contradictory ZIP metadata');
+  } else {
+    if (end >= 20) {
+      const precedingSignature = await reader.readExact(end - 20, 4, 'pre-EOCD record');
+      if (u32(precedingSignature, 0) === 0x07064b50) fail('unnecessary ZIP64 end records');
+    }
+    if (disk !== 0 || centralDisk !== 0 || diskCount !== count) {
+      fail('multi-disk or contradictory ZIP metadata');
+    }
   }
   if (count !== 2 || diskCount !== count || centralSize > MAX_CENTRAL
       || safeAdd(centralOffset, centralSize) !== directoryEnd) fail('central directory envelope');

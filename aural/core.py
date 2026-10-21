@@ -522,8 +522,13 @@ def _preflight_archive(source):
             disk_entries, entries = zip64_disk_entries, zip64_entries
             central_size, central_offset = zip64_central_size, zip64_central_offset
             directory_end = zip64_offset
-        elif disk != 0 or central_disk != 0 or disk_entries != entries:
-            raise AuralError('Multi-disk or contradictory ZIP metadata')
+        else:
+            if eocd_offset >= 20:
+                source.seek(eocd_offset - 20)
+                if _read_exact(source, 4, 'pre-EOCD record') == zipfile.stringEndArchive64Locator:
+                    raise AuralError('Unnecessary ZIP64 end records are not allowed')
+            if disk != 0 or central_disk != 0 or disk_entries != entries:
+                raise AuralError('Multi-disk or contradictory ZIP metadata')
 
         if entries > MAX_ENTRIES:
             raise AuralError('ZIP entry count exceeds implementation limit')

@@ -48,6 +48,7 @@ The synthetic original is 52 bytes with SHA-256 `125f39eda3fea4265c129447c18ea5a
 |---|---|---|
 | `valid-minimal.aural` | accept-0.2 | minimal canonical package |
 | `valid-independent.aural` | accept-0.2 | independently assembled canonical manifest and classic ZIP records |
+| `valid-required-zip64-end.aural` | accept-0.2 | ZIP64 end records required by classic EOCD count sentinels |
 | `valid-unicode.aural` | accept-0.2 | Unicode plus UTF-16 JCS ordering |
 | `valid-unknown-optional.aural` | accept-0.2 | unknown optional extension |
 | `legacy-0.1.aural` | accept-legacy-0.1 | distinct legacy path |
@@ -65,9 +66,11 @@ The synthetic original is 52 bytes with SHA-256 `125f39eda3fea4265c129447c18ea5a
 | `invalid-asset-hash.aural` | reject | incorrect declared SHA-256 |
 | `invalid-altered-original.aural` | reject | altered audio with internally correct ZIP CRC32 |
 | `invalid-malformed-local-header.aural` | reject | bad local-header signature |
+| `invalid-missing-required-zip64-end.aural` | reject | classic EOCD sentinels without the required ZIP64 end records |
 | `invalid-local-central-crc.aural` | reject | local/central CRC disagreement |
 | `invalid-extra-field.aural` | reject | non-ZIP64 extra field |
 | `invalid-unnecessary-zip64-extra.aural` | reject | Draft 0.2 ZIP64 field without a corresponding sentinel |
+| `invalid-redundant-zip64-end.aural` | reject | ZIP64 end records without a corresponding classic EOCD sentinel |
 | `invalid-entry-comment.aural` | reject | central-directory entry comment |
 | `invalid-special-file.aural` | reject | Unix symlink metadata |
 | `invalid-unsafe-filename.aural` | reject | traversal/undeclared path |
@@ -79,7 +82,7 @@ The synthetic original is 52 bytes with SHA-256 `125f39eda3fea4265c129447c18ea5a
 | `invalid-critical-extension.aural` | reject | unsupported critical extension |
 | `invalid-unknown-member.aural` | reject | unknown member outside extension point |
 
-The suite additionally covers a valid bounded ZIP64 envelope, malformed ZIP64 locator, archive prefix, ZIP and central-directory entry comments, embedded NUL names, local/central filename disagreement, excessive entry count and central-directory size, extraction snapshot integrity, no-overwrite behavior, byte-identical legacy extraction, and pre-allocation rejection through a reduced Node archive ceiling that cannot raise the normative limit.
+The public corpus covers classic archives, a required bounded ZIP64 end-record chain, a missing required chain, a redundant otherwise-valid chain, and an unnecessary entry-level ZIP64 extra field. The suite additionally covers malformed ZIP64 locators, archive prefixes, ZIP and central-directory entry comments, embedded NUL names, local/central filename disagreement, excessive entry count and central-directory size, extraction snapshot integrity, no-overwrite behavior, byte-identical legacy extraction, and pre-allocation rejection through a reduced Node archive ceiling that cannot raise the normative limit.
 
 ## Verification report requirements
 

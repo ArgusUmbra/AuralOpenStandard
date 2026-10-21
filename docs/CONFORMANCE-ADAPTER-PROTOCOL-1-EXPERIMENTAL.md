@@ -114,7 +114,7 @@ The adapter never receives the expected result. After validating a response, the
 
 A correctly rejected negative case therefore passes. A crash on a negative case does not.
 
-Core Reader 0.2 reports `PASS` only when all 30 required Draft 0.2 cases execute and pass. A required `ERROR`, `TIMEOUT`, `SKIP`, missing case, or wrong required inventory makes the profile `INCOMPLETE`. A valid incorrect required outcome makes it `FAIL` when required execution otherwise completed. The two optional Draft 0.1 cases are reported separately and never silently alter the Core Reader 0.2 result.
+Core Reader 0.2 reports `PASS` only when all 33 required Draft 0.2 cases execute and pass. A required `ERROR`, `TIMEOUT`, `SKIP`, missing case, or wrong required inventory makes the profile `INCOMPLETE`. A valid incorrect required outcome makes it `FAIL` when required execution otherwise completed. The two optional Draft 0.1 cases are reported separately and never silently alter the Core Reader 0.2 result.
 
 ## 7. Security boundary
 

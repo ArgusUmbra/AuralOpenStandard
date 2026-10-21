@@ -12,13 +12,13 @@
     "id": "aural-core-reader",
     "version": "0.2-draft",
     "status": "draft",
-    "required_case_count": 30,
+    "required_case_count": 33,
     "optional_case_count": 2
   },
   "scope": {
     "coverage": "partial-public-conformance-inventory",
     "limitations": [
-      "Dynamically generated ZIP64 test cases are not included.",
+      "Large-file ZIP64 aggregate boundary cases are not included.",
       "The Core Writer profile is not included.",
       "Signed provenance is not included.",
       "Signed-event graphs are not included.",
@@ -344,6 +344,27 @@
       "resource_tier": "ordinary"
     },
     {
+      "id": "aural-core-reader/0.2-draft/invalid-missing-required-zip64-end",
+      "applicable_profile": {
+        "id": "aural-core-reader",
+        "version": "0.2-draft"
+      },
+      "status": "required",
+      "target_format_version": "0.2-draft",
+      "input": {
+        "role": "package",
+        "path": "invalid-missing-required-zip64-end.aural",
+        "sha256": "fb6db3b8a5aa22d4a8bd15c6e764ad876188667500deadd46608f542f03c0368",
+        "size": 549
+      },
+      "expected": {
+        "outcome": "reject",
+        "indexed_outcome": "reject"
+      },
+      "informative_reason": "classic EOCD sentinels require a ZIP64 EOCD record and locator",
+      "resource_tier": "ordinary"
+    },
+    {
       "id": "aural-core-reader/0.2-draft/invalid-noncanonical",
       "applicable_profile": {
         "id": "aural-core-reader",
@@ -404,6 +425,27 @@
         "indexed_outcome": "reject"
       },
       "informative_reason": "entry metadata describes a symlink",
+      "resource_tier": "ordinary"
+    },
+    {
+      "id": "aural-core-reader/0.2-draft/invalid-redundant-zip64-end",
+      "applicable_profile": {
+        "id": "aural-core-reader",
+        "version": "0.2-draft"
+      },
+      "status": "required",
+      "target_format_version": "0.2-draft",
+      "input": {
+        "role": "package",
+        "path": "invalid-redundant-zip64-end.aural",
+        "sha256": "4950711ac54d29564b437e38383c5aa69c4f7fed732ab2deb7b1394a76e1201d",
+        "size": 625
+      },
+      "expected": {
+        "outcome": "reject",
+        "indexed_outcome": "reject"
+      },
+      "informative_reason": "ZIP64 EOCD end records are prohibited without a classic EOCD sentinel",
       "resource_tier": "ordinary"
     },
     {
@@ -679,6 +721,27 @@
         "indexed_outcome": "accept-0.2"
       },
       "informative_reason": "Unicode and UTF-16 JCS key ordering",
+      "resource_tier": "ordinary"
+    },
+    {
+      "id": "aural-core-reader/0.2-draft/valid-required-zip64-end",
+      "applicable_profile": {
+        "id": "aural-core-reader",
+        "version": "0.2-draft"
+      },
+      "status": "required",
+      "target_format_version": "0.2-draft",
+      "input": {
+        "role": "package",
+        "path": "valid-required-zip64-end.aural",
+        "sha256": "c4b2019336614e509388f04ddefeef5311052a3a81355892869c16bef621866b",
+        "size": 625
+      },
+      "expected": {
+        "outcome": "accept",
+        "indexed_outcome": "accept-0.2"
+      },
+      "informative_reason": "ZIP64 EOCD record and locator required by classic EOCD count sentinels",
       "resource_tier": "ordinary"
     },
     {

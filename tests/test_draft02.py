@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -177,6 +178,24 @@ class Draft02Tests(unittest.TestCase):
         self.assertEqual('0.1-draft', legacy['version'])
         with self.assertRaisesRegex(AuralError, 'Unnecessary ZIP64'):
             verify(CORPUS / 'invalid-unnecessary-zip64-extra.aural')
+
+    def test_zip64_end_record_necessity_vectors(self):
+        required = bytearray((CORPUS / 'valid-required-zip64-end.aural').read_bytes())
+        redundant = bytearray((CORPUS / 'invalid-redundant-zip64-end.aural').read_bytes())
+        self.assertEqual(len(required), len(redundant))
+        self.assertEqual(b'\xff' * 4, required[-14:-10])
+        self.assertEqual(struct.pack('<HH', 2, 2), redundant[-14:-10])
+        required[-14:-10] = redundant[-14:-10]
+        self.assertEqual(required, redundant)
+
+        self.assertEqual(
+            'integrity_valid',
+            verify(CORPUS / 'valid-required-zip64-end.aural')['status'],
+        )
+        with self.assertRaisesRegex(AuralError, 'Unnecessary ZIP64 end records'):
+            verify(CORPUS / 'invalid-redundant-zip64-end.aural')
+        with self.assertRaisesRegex(AuralError, 'Missing ZIP64 locator'):
+            verify(CORPUS / 'invalid-missing-required-zip64-end.aural')
 
     def test_central_directory_entry_comment_is_present_and_rejected(self):
         path = CORPUS / 'invalid-entry-comment.aural'

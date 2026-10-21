@@ -150,7 +150,7 @@ This display is non-normative and wrapped for readability. A stored manifest has
 
 ### 6.1 Records and methods
 
-The container MUST be a single-disk ZIP archive following APPNOTE 6.3.10. It MUST contain one local header and one central-directory header for each of the two entries, followed by one central directory and one end-of-central-directory (EOCD) record. ZIP64 records MAY appear only as allowed below.
+The container MUST be a single-disk ZIP archive following APPNOTE 6.3.10. It MUST contain one local header and one central-directory header for each of the two entries, followed by one central directory and one end-of-central-directory (EOCD) record. ZIP64 end records and entry-level ZIP64 extra fields MUST satisfy their separate necessity rules in Section 6.4; neither form is permitted as an optional alternative encoding.
 
 Both entries MUST use compression method 0 (stored). Encryption, patched data, strong encryption, central-directory encryption, data descriptors, archive-extra-data records, central-directory digital signatures, split/spanned disks, and any other compression method are prohibited.
 
@@ -174,9 +174,9 @@ Entry order is not significant to readers. Writers SHOULD place `manifest.json` 
 
 The archive comment and every entry comment MUST be empty.
 
-The only permitted local or central extra field is ZIP64 extended information header ID `0x0001`. It MUST occur at most once in a header, only when a corresponding 32-bit field contains its ZIP64 sentinel, and contain exactly the required values in APPNOTE order with no trailing data. Every other extra field is prohibited.
+The only permitted local or central extra field is ZIP64 extended information header ID `0x0001`. Local and central headers are evaluated independently. In either header, this extra field MUST occur exactly once when at least one corresponding classic size, disk-start, or local-header-offset field uses its ZIP64 sentinel, and MUST NOT occur when none of that header's corresponding classic fields uses a ZIP64 sentinel. Its data MUST contain every value required by those sentinels, contain no value for a non-sentinel field, follow APPNOTE order, and have exactly the resulting length with no trailing data. Every other extra field is prohibited.
 
-Readers and writers MUST support ZIP64 for an original above the classic limit. When the classic EOCD uses a ZIP64 sentinel, a ZIP64 EOCD version-1 record of size exactly 44 bytes and a single-disk ZIP64 locator MUST be present and consistent. A ZIP64 extensible data sector is prohibited. Classic non-sentinel values, if present, MUST equal their ZIP64 values.
+Readers and writers MUST support ZIP64 for an original above the classic limit. When any classic EOCD disk-number, entry-count, central-directory-size, or central-directory-offset field uses its ZIP64 sentinel, a ZIP64 EOCD version-1 record of size exactly 44 bytes and a single-disk ZIP64 locator MUST be present and consistent. When none of those classic EOCD fields uses its ZIP64 sentinel, a ZIP64 EOCD record and ZIP64 locator MUST NOT be present. A ZIP64 extensible data sector is prohibited. Classic non-sentinel values, if present alongside a required ZIP64 EOCD record, MUST equal their ZIP64 values.
 
 Version-needed MUST be 1.0, 2.0, or 4.5 (`10`, `20`, or `45`) and MUST be sufficient for the used structures.
 
@@ -242,7 +242,7 @@ Draft 0.1 cannot be relabeled because its canonical manifest has a trailing LF, 
 
 ## 9. Canonical identity and deterministic output
 
-The canonical manifest bytes and original SHA-256 provide logical comparison points. This specification does not define a canonical ZIP byte stream. Whole-archive hashes can differ because permitted ZIP metadata and ZIP64 choices differ. Applications comparing packages SHOULD compare verified version, canonical manifest bytes, and asset digests rather than assuming archive-byte equality.
+The canonical manifest bytes and original SHA-256 provide logical comparison points. This specification does not define a canonical ZIP byte stream. Whole-archive hashes can differ because permitted ZIP metadata, entry order, and timestamps differ. ZIP64 representation is necessity-based rather than a writer choice. Applications comparing packages SHOULD compare verified version, canonical manifest bytes, and asset digests rather than assuming archive-byte equality.
 
 ## 10. Security and privacy considerations
 

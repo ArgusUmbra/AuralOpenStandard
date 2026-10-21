@@ -30,11 +30,11 @@ The `audio/wav` value is retained for deployed compatibility, but it is not curr
 
 Stored method 0 makes size budgeting and byte preservation easy to audit and removes decompression-bomb behavior. Fixed ASCII paths eliminate filename-normalization and legacy-encoding ambiguity. Data descriptors, encryption, comments, non-ZIP64 extra fields, split archives, prefixes, trailers, gaps, and special files are prohibited.
 
-ZIP64 is retained because the normative maximum original is 8 GiB. Readers accept structurally necessary ZIP64 and the bounded archive-level form; writers use it when their ZIP library requires it. ZIP metadata such as timestamps and creator platform is not evidence metadata.
+ZIP64 is retained because the normative maximum original is 8 GiB. Readers accept structurally necessary ZIP64 only; writers use it only when a corresponding classic field cannot represent its value. ZIP metadata such as timestamps and creator platform is not evidence metadata.
 
 ## D-005: logical canonicality is not deterministic ZIP output
 
-The manifest and original payload have canonical identities. The enclosing ZIP byte stream does not: legal creator fields, permission bits, entry order, timestamps, and classic-versus-ZIP64 choices can differ. Two conformant packages can therefore have different whole-file SHA-256 values while representing the same logical package.
+The manifest and original payload have canonical identities. The enclosing ZIP byte stream does not: legal creator fields, permission bits, entry order, and timestamps can differ. ZIP64 use is determined by classic-field capacity and is not an independent writer choice. Two conformant packages can therefore have different whole-file SHA-256 values while representing the same logical package.
 
 Reference writers use stable timestamps and entry order as a reproducibility aid. Readers do not depend on those choices.
 
@@ -67,3 +67,9 @@ High-level ZIP APIs commonly hide duplicate entries, local/central disagreements
 Version-independent preflight rejects unsafe sizes, offsets, malformed extra-field framing, duplicate ZIP64 fields, and truncated required ZIP64 values. Draft 0.2 then applies its stricter rule that a ZIP64 extra field is present only when a corresponding sentinel requires it.
 
 Draft 0.1 did not prohibit a well-framed unnecessary ZIP64 extra field, and the Assignment 002 verifier at commit `6abee8b` accepted it. The compatibility path retains that bounded behavior without relaxing Draft 0.2. Malformed extra-field framing, duplicate ZIP64 fields, missing required values, and oversized required ZIP64 data remain rejected for both versions.
+
+## D-012: ZIP64 is strictly necessity-based in Draft 0.2
+
+Draft 0.2 requires an archive-level ZIP64 EOCD record and locator if any corresponding classic EOCD field uses its ZIP64 sentinel, and prohibits both records otherwise. Local and central ZIP64 extra fields follow the same necessity rule independently: every sentinel-required value is present in APPNOTE order, no non-required value or trailing byte is present, and the extra field is absent when that header has no corresponding sentinel.
+
+The earlier wording required the archive-level chain when a sentinel appeared but did not state the converse as a direct `MUST NOT`. That allowed readers to disagree about a redundant but internally consistent ZIP64 chain. The strict rule removes that interoperability ambiguity, minimizes equivalent structural encodings, and aligns archive-level behavior with the already explicit per-entry rule. This is a behavioral clarification: readers that accepted unnecessary ZIP64 end records must change, while conforming classic archives and necessity-driven ZIP64 archives are unchanged.

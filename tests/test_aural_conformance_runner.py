@@ -216,7 +216,7 @@ class ConformanceRunnerTests(unittest.TestCase):
         self.assertEqual(runner.EXIT_INCOMPLETE, status)
         document = json.loads(report.read_text(encoding="utf-8"))
         self.assertEqual("INCOMPLETE", document["overall_result"])
-        self.assertEqual(30, document["summary"]["execution_errors"])
+        self.assertEqual(33, document["summary"]["execution_errors"])
 
     def test_paths_containing_spaces_are_preserved_as_one_argument(self):
         spaced_executable = self.adapter_dir / Path(sys.executable).name
@@ -242,9 +242,9 @@ class ConformanceRunnerTests(unittest.TestCase):
             result["status"] = "PASS"
             result.pop("error")
             results.append(result)
-        summary = runner.summarize(results, 30)
+        summary = runner.summarize(results, 33)
         self.assertEqual("INCOMPLETE", summary["overall_result"])
-        self.assertEqual(29, summary["required"]["selected"])
+        self.assertEqual(32, summary["required"]["selected"])
 
     def test_explicit_required_skip_is_incomplete(self):
         required = [item for item in self.cases if item.requirement == "required"]
@@ -255,7 +255,7 @@ class ConformanceRunnerTests(unittest.TestCase):
                 result["status"] = "PASS"
                 result.pop("error")
             results.append(result)
-        summary = runner.summarize(results, 30)
+        summary = runner.summarize(results, 33)
         self.assertEqual("INCOMPLETE", summary["overall_result"])
         self.assertEqual(1, summary["required"]["skipped"])
 
@@ -264,7 +264,7 @@ class ConformanceRunnerTests(unittest.TestCase):
         self.assertEqual(runner.EXIT_PASS, status)
         document = json.loads(report.read_text(encoding="utf-8"))
         self.assertTrue(document["optional_legacy_included"])
-        self.assertEqual(32, len(document["cases"]))
+        self.assertEqual(35, len(document["cases"]))
         self.assertEqual(2, document["summary"]["optional"]["passed"])
         self.assertEqual("PASS", document["overall_result"])
 
@@ -275,7 +275,7 @@ class ConformanceRunnerTests(unittest.TestCase):
             result["status"] = "PASS" if case.requirement == "required" else "FAIL"
             result.pop("error")
             results.append(result)
-        summary = runner.summarize(results, 30)
+        summary = runner.summarize(results, 33)
         self.assertEqual(2, summary["optional"]["failed"])
         self.assertEqual("PASS", summary["overall_result"])
 
@@ -288,8 +288,8 @@ class ConformanceRunnerTests(unittest.TestCase):
             result = runner.skipped_case_result(case)
             result["status"] = statuses[index] if index < len(statuses) else "PASS"
             results.append(result)
-        summary = runner.summarize(results, 30)
-        self.assertEqual(26, summary["passed"])
+        summary = runner.summarize(results, 33)
+        self.assertEqual(29, summary["passed"])
         self.assertEqual(1, summary["failed"])
         self.assertEqual(1, summary["execution_errors"])
         self.assertEqual(1, summary["timeouts"])
@@ -301,8 +301,8 @@ class ConformanceRunnerTests(unittest.TestCase):
         document = json.loads(report.read_text(encoding="utf-8"))
         self.assertEqual(runner.REPORT_SCHEMA, document["schema"])
         self.assertEqual(1, document["schema_version"])
-        self.assertEqual(30, len(document["cases"]))
-        self.assertEqual(30, document["summary"]["required_cases"])
+        self.assertEqual(33, len(document["cases"]))
+        self.assertEqual(33, document["summary"]["required_cases"])
         self.assertEqual("PASS", document["overall_result"])
         case = document["cases"][0]
         self.assertEqual(
@@ -320,7 +320,7 @@ class ConformanceRunnerTests(unittest.TestCase):
         self.assertEqual(runner.EXIT_FAIL, status)
         document = json.loads(report.read_text(encoding="utf-8"))
         self.assertEqual("FAIL", document["overall_result"])
-        self.assertEqual(4, document["summary"]["required"]["failed"])
+        self.assertEqual(5, document["summary"]["required"]["failed"])
 
     def test_correct_adapter_has_success_exit_status(self):
         status, report = self.invoke("correct")
